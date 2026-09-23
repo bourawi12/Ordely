@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Order status: "pending" (awaiting confirmation), "confirmed" or "cancelled".
+model Order {
+  id        Int      @id @default(autoincrement())
+  customer  String   @db.VarChar
+  phone     String   @default("") @db.VarChar(30)
+  item      String   @db.VarChar
+  quantity  Int
+  /// Order value in TND (3 decimals for millimes).
+  total     Decimal  @default(0) @db.Decimal(10, 3)
+  status    String   @default("pending") @db.VarChar(20)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  calls     Call[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+/// One confirmation call attempt for an order.
+/// Status: "pending" (queued), "confirmed", "failed" or "no_answer".
+model Call {
+  id              Int      @id @default(autoincrement())
+  orderId         Int
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status          String   @default("pending") @db.VarChar(20)
+  attempt         Int      @default(1)
+  durationSeconds Int?
+  language        String?  @db.VarChar(30)
+  /// [{ "speaker": "agent" | "customer", "text": string }]
+  transcript      Json?
+  recordingUrl    String?
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("calls")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("users")
+}

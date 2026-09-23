@@ -1,0 +1,340 @@
+.shell {
+  --sidebar-w: 280px;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--surface);
+  color: var(--text);
+  transition: grid-template-columns 0.25s ease;
+}
+
+/* ---------- Sidebar ---------- */
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  height: 88px;
+  padding: 0 2rem;
+  overflow: hidden;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.7rem;
+  color: var(--accent);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.25rem 1rem;
+}
+
+.brandMark {
+  display: none;
+  width: 40px;
+  height: 40px;
+  color: var(--accent);
+}
+
+.brandMark svg {
+  width: 100%;
+  height: 100%;
+}
+
+.navLink {
+  display: flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 1.02rem;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.navLink:hover {
+  background: var(--app-bg);
+  color: var(--text);
+}
+
+.navLink.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.plan {
+  margin: auto 1.25rem 1.5rem;
+  padding: 1.1rem 1rem 1rem;
+  border-radius: 14px;
+  background: var(--accent-soft);
+}
+
+.planName {
+  margin: 0;
+  font-weight: 500;
+}
+
+.planUsage {
+  margin: 0.35rem 0 0.8rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.planBar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.planBar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.planBtn {
+  display: block;
+  margin-top: 1rem;
+  padding: 0.6rem;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-text) !important;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ---------- Main column ---------- */
+
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 88px;
+  padding: 0.75rem 2.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.subtitle {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.menuBtn {
+  composes: iconBtn;
+}
+
+.user {
+  position: relative;
+}
+
+.userBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.25rem 0.25rem 0.25rem;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+
+.userBtn::-webkit-details-marker {
+  display: none;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1e63ff, #0b1f44);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.userMenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 20;
+  min-width: 220px;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 20px 40px -20px rgba(11, 31, 68, 0.35);
+}
+
+.userMenu p {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.userMenu a,
+.userMenu button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.userMenu a:hover,
+.userMenu button:hover {
+  background: var(--app-bg);
+}
+
+.content {
+  padding: 2.25rem 2.5rem 3rem;
+}
+
+/* ---------- Collapsed (desktop icon rail) ---------- */
+
+@media (min-width: 961px) {
+  .collapsed {
+    --sidebar-w: 88px;
+  }
+
+  .collapsed .brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .collapsed .brandFull,
+  .collapsed .navLabel,
+  .collapsed .plan {
+    display: none;
+  }
+
+  .collapsed .brandMark {
+    display: block;
+  }
+
+  .collapsed .nav {
+    padding-inline: 0.75rem;
+  }
+
+  .collapsed .navLink {
+    justify-content: center;
+    padding-inline: 0;
+  }
+}
+
+.backdrop {
+  display: none;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 960px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: 0;
+    z-index: 40;
+    width: 280px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  .sidebarOpen {
+    transform: none;
+    box-shadow: 0 0 60px rgba(11, 31, 68, 0.3);
+  }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(11, 31, 68, 0.35);
+  }
+
+  .topbar {
+    padding: 0.75rem 1rem;
+  }
+
+  .title {
+    font-size: 1.3rem;
+  }
+
+  .userName {
+    display: none;
+  }
+
+  .content {
+    padding: 1.25rem 1rem 2rem;
+  }
+}

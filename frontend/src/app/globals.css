@@ -1,0 +1,260 @@
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --text: #0b1f44;
+  --muted: #6b6b76;
+  --border: #e3e9f4;
+  --accent: #1e63ff;
+  --accent-text: #ffffff;
+  --danger: #dc2626;
+  --success-bg: #dcfce7;
+  --success-text: #166534;
+  --pending-bg: #fef3c7;
+  --pending-text: #92400e;
+  --fail-bg: #fdecec;
+  --fail-text: #c62828;
+  --neutral-bg: #eef0f3;
+  --neutral-text: #5b6472;
+  --accent-soft: #edf2ff;
+  --track: #eef3fd;
+  --positive: #16a34a;
+  --negative: #dc2626;
+  --app-bg: #f8f9fb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a1428;
+    --surface: #0f1f3d;
+    --text: #ededf0;
+    --muted: #9a9aa5;
+    --border: #1d3260;
+    --accent: #5b8cff;
+    --accent-text: #0a1428;
+    --danger: #f87171;
+    --success-bg: #14532d;
+    --success-text: #bbf7d0;
+    --pending-bg: #78350f;
+    --pending-text: #fde68a;
+    --fail-bg: #4c1414;
+    --fail-text: #fca5a5;
+    --neutral-bg: #1f2b44;
+    --neutral-text: #a9b4c8;
+    --accent-soft: #15295a;
+    --track: #14254a;
+    --positive: #4ade80;
+    --negative: #f87171;
+    --app-bg: #0a1428;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.header nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.brand {
+  font-size: 1.6rem;
+  color: var(--accent);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.card h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+input {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+button,
+.button {
+  display: inline-block;
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+button.danger {
+  background: var(--danger);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+
+.badge-completed {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.badge-pending {
+  background: var(--pending-bg);
+  color: var(--pending-text);
+}
+
+.details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1.5rem;
+  margin: 0 0 1.25rem;
+}
+
+.details dt {
+  color: var(--muted);
+}
+
+.details dd {
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.header nav {
+  align-items: center;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
+}
+
+button.link-button {
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -1,0 +1,53 @@
+.logo {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: inherit;
+  padding-bottom: 0.18em;
+}
+
+.smile {
+  position: absolute;
+  left: 43%;
+  width: 36%;
+  top: 0.8em;
+  overflow: visible;
+}
+
+.smile path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+
+.reg {
+  font-size: 0.22em;
+  font-weight: 600;
+  margin-left: 0.15em;
+  margin-top: 0.6em;
+  letter-spacing: 0;
+}
+
+.animated .smile path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.35s forwards;
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated .smile path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

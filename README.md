@@ -69,3 +69,82 @@ cd ordely-core
 # Install dependencies and start local development services
 npm install
 docker-compose up -d
+```
+
+---
+
+## 🛠️ Development
+
+This repository contains the Ordely web app: a NestJS API, a Next.js dashboard and landing page, and PostgreSQL.
+
+| Service    | Stack                  | Default URL                 |
+| ---------- | ---------------------- | --------------------------- |
+| `frontend` | Next.js 15             | http://localhost:3200       |
+| `backend`  | NestJS 10 + Prisma 6   | http://localhost:3001/api   |
+| `db`       | PostgreSQL 16          | `localhost:5433`            |
+
+### Run everything with Docker
+
+```bash
+docker compose up -d --build
+```
+
+A root `.env` with `JWT_SECRET` is required (see [.env.example](.env.example));
+host ports, database name and credentials can be overridden there too. Data is kept in the `db-data` volume;
+`docker compose down -v` wipes it.
+
+### Local development
+
+Run only the database in Docker and the apps on your machine:
+
+```bash
+docker compose up -d db
+
+# backend
+cd backend && npm install && npm run prisma:deploy && npm run start:dev
+
+# frontend, in another terminal
+cd frontend && npm install && npm run dev
+```
+
+The backend reads `DATABASE_URL` and `JWT_SECRET` from `backend/.env`. The frontend reaches the
+backend server-side using `BACKEND_URL` from `frontend/.env.local`.
+
+### Database (Prisma)
+
+The schema lives in `backend/prisma/schema.prisma`. After changing it:
+
+```bash
+cd backend
+npm run prisma:migrate -- --name <change-name>   # creates + applies a migration
+npm run prisma:studio                            # browse the data
+```
+
+The Docker backend applies pending migrations (`prisma migrate deploy`) on startup.
+
+Demo data (≈60 days of orders and confirmation calls; users are never touched):
+
+```bash
+cd backend
+npm run db:seed              # only runs on an empty orders table
+npm run db:seed -- --reset   # replaces ALL orders and calls
+```
+
+### Authentication
+
+- Users sign up at `/register` and log in at `/login`; `/dashboard` and `/orders` require a session.
+- The backend issues a JWT (`JWT_EXPIRES_IN` seconds, default 1 day). The frontend stores it in an
+  HttpOnly `ordely_session` cookie and sends it as a Bearer token on server-side API calls.
+- Every API route requires `Authorization: Bearer <token>` except `/api/health` and `/api/auth/*`.
+- Login and register are rate-limited per email (10 and 5 attempts per minute).
+
+### API
+
+- `GET /api/health` — reports app and database status (public)
+- `POST /api/auth/register` `{ email, name, password }` · `POST /api/auth/login` `{ email, password }` (public)
+- `GET /api/auth/me`
+- `GET /api/dashboard/summary` — 30-day stats, 7-day confirmations, recent calls, pending orders
+- `GET /api/calls?status=&search=&range=today|7d|30d|all&page=` · `GET /api/calls/export` (CSV) · `GET /api/calls/:id`
+- `POST /api/calls` `{ orderId }` queues a call · `POST /api/calls/queue-pending` · `GET /api/calls/usage`
+- `GET /api/orders` · `POST /api/orders` `{ customer, phone, item, quantity, total }`
+- `GET /api/orders/:id` · `PATCH /api/orders/:id` `{ status }` · `DELETE /api/orders/:id`

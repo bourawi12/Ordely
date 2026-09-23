@@ -1,0 +1,202 @@
+/* Shared building blocks for the signed-in app. */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.cardPad {
+  padding: 1.75rem 2rem;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.pill {
+  padding: 0.3rem 0.7rem;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Buttons */
+.btn,
+.btnSoft,
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 500;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.btn {
+  border: none;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btnSoft {
+  border: none;
+  padding: 0.45rem 0.95rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.btnSoft:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.btnGhost {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.btnGhost:hover {
+  border-color: var(--accent);
+}
+
+.btn:disabled,
+.btnSoft:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Tables */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.98rem;
+}
+
+.table th {
+  padding: 0.85rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 1rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.strong {
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.empty {
+  padding: 2.5rem 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  padding: 0.3rem 0.65rem;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.confirmed {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.failed,
+.cancelled {
+  background: var(--fail-bg);
+  color: var(--fail-text);
+}
+
+.no_answer {
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+}
+
+.pending {
+  background: var(--pending-bg);
+  color: var(--pending-text);
+}
+
+/* Forms */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.input {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-color: var(--accent);
+}
+
+.error {
+  margin: 0;
+  color: var(--fail-text);
+  font-size: 0.9rem;
+}
