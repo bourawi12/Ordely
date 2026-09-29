@@ -1,13 +1,13 @@
 ﻿"use client";
 
 import { useState } from "react";
-import Icon from "@/components/Icon";
+import Icon, { type IconName } from "@/components/Icon";
 import styles from "./settings.module.css";
 
 interface Tab {
   id: "profile" | "security" | "session";
   label: string;
-  icon: string;
+  icon: IconName;
 }
 
 const TABS: Tab[] = [
@@ -48,7 +48,7 @@ export function SettingsTabs({
             onClick={() => setActive(tab.id)}
             className={`${styles.tabBtn} ${active === tab.id ? styles.tabBtnActive : ""}`}
           >
-            <Icon name={tab.icon as any} size={16} />
+            <Icon name={tab.icon} size={16} />
             {tab.label}
           </button>
         ))}

@@ -88,6 +88,8 @@ export interface User {
   id: number;
   email: string;
   name: string;
+  /** Signed, short-lived URL of the profile picture (stored in MinIO), or null. */
+  avatarUrl: string | null;
   createdAt: string;
 }
 
@@ -137,7 +139,8 @@ async function send(
   const res = await fetch(`${BACKEND_URL}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      // FormData sets its own multipart Content-Type (with the boundary).
+      ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
@@ -195,6 +198,10 @@ export const api = {
     ),
   me: () => request<User>("/auth/me"),
 
+  /** multipart body with the image in the "file" field. */
+  uploadAvatar: (form: FormData) =>
+    request<User>("/auth/avatar", { method: "POST", body: form }),
+  removeAvatar: () => request<User>("/auth/avatar", { method: "DELETE" }),
 updateProfile: (data: { name: string }) =>
   request<User>("/auth/profile", {
     method: "PATCH",

@@ -136,7 +136,13 @@ export default function AppShell({
           <details className={styles.user}>
             <summary className={styles.userBtn}>
               <span className={styles.avatar} aria-hidden="true">
-                {initials(user.name)}
+                {user.avatarUrl ? (
+                  // Signed MinIO URL, different on each render: next/image would add nothing.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.avatarUrl} alt="" className={styles.avatarImg} />
+                ) : (
+                  initials(user.name)
+                )}
               </span>
               <span className={styles.userName}>{user.name}</span>
             </summary>

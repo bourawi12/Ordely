@@ -42,7 +42,11 @@ describe('App (e2e)', () => {
       .get('/health')
       .expect(200)
       .expect((res) => {
-        expect(res.body).toMatchObject({ status: 'ok', database: 'up' });
+        expect(res.body).toMatchObject({
+          status: 'ok',
+          database: 'up',
+          storage: 'up',
+        });
       });
   });
 
@@ -184,6 +188,57 @@ describe('App (e2e)', () => {
             carrier: 'aramex',
           });
         });
+    });
+  });
+
+  describe('profile picture (MinIO)', () => {
+    // A real 1×1 PNG.
+    const PNG = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+
+    it('stores the picture privately and serves it through a signed URL, then deletes it', async () => {
+      const server = app.getHttpServer();
+      const auth = { Authorization: `Bearer ${token}` };
+
+      await request(server)
+        .post('/auth/avatar')
+        .set(auth)
+        .attach('file', Buffer.from('not an image'), 'photo.png')
+        .expect(400);
+
+      const uploaded = await request(server)
+        .post('/auth/avatar')
+        .set(auth)
+        .attach('file', PNG, { filename: 'me.png', contentType: 'image/png' })
+        .expect(200);
+      const url: string = uploaded.body.avatarUrl;
+      expect(url).toMatch(/X-Amz-Signature=/);
+      expect(uploaded.body).not.toHaveProperty('avatarKey');
+
+      // The signed URL works like a browser would load it…
+      const signed = await fetch(url);
+      expect(signed.status).toBe(200);
+      expect(signed.headers.get('content-type')).toBe('image/png');
+      // …while the same object without a signature is refused: the bucket is private.
+      const unsigned = await fetch(url.split('?')[0]);
+      expect(unsigned.status).toBe(403);
+
+      await request(server)
+        .get('/auth/me')
+        .set(auth)
+        .expect(200)
+        .expect((res) =>
+          expect(res.body.avatarUrl).toMatch(/X-Amz-Signature=/),
+        );
+
+      await request(server)
+        .delete('/auth/avatar')
+        .set(auth)
+        .expect(200)
+        .expect((res) => expect(res.body.avatarUrl).toBeNull());
+      expect((await fetch(url)).status).toBe(404);
     });
   });
 

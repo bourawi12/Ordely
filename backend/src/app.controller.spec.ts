@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
+import { StorageService } from './storage/storage.service';
 
 describe('AppController', () => {
   let appController: AppController;
@@ -14,6 +15,10 @@ describe('AppController', () => {
       providers: [
         AppService,
         { provide: PrismaService, useValue: { $queryRaw } },
+        {
+          provide: StorageService,
+          useValue: { isUp: jest.fn().mockResolvedValue(true) },
+        },
       ],
     }).compile();
 

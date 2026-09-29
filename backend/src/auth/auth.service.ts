@@ -2,13 +2,17 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { detectImageType } from '../storage/image-type';
+import { StorageService } from '../storage/storage.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -19,7 +23,13 @@ const BCRYPT_ROUNDS = 12;
 // Compared against when the email is unknown, so both failure paths take the same time.
 const DUMMY_HASH = bcrypt.hashSync('timing-equalizer', BCRYPT_ROUNDS);
 
-export type PublicUser = Omit<User, 'passwordHash'>;
+/** Largest accepted profile picture, in bytes. */
+export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+
+/** A user as the API returns it: no password hash, and a signed URL instead of the storage key. */
+export type PublicUser = Omit<User, 'passwordHash' | 'avatarKey'> & {
+  avatarUrl: string | null;
+};
 
 export interface AuthResult {
   accessToken: string;
@@ -29,10 +39,13 @@ export interface AuthResult {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResult> {
@@ -83,7 +96,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException();
     }
-    return toPublicUser(user);
+    return this.publicUser(user);
   }
 
   async updateProfile(
@@ -98,7 +111,7 @@ export class AuthService {
       where: { id: userId },
       data: { name: dto.name },
     });
-    return toPublicUser(updated);
+    return this.publicUser(updated);
   }
 
   async changePassword(
@@ -121,18 +134,77 @@ export class AuthService {
     return { success: true };
   }
 
+  /** Stores a new profile picture (JPEG, PNG or WebP, 2 MB max) and drops the old one. */
+  async uploadAvatar(
+    userId: number,
+    file: { buffer: Buffer; size: number } | undefined,
+  ): Promise<PublicUser> {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Choisissez une image à envoyer.');
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      throw new BadRequestException("L'image dépasse 2 Mo.");
+    }
+    const type = detectImageType(file.buffer);
+    if (!type) {
+      throw new BadRequestException(
+        'Format non pris en charge. Utilisez une image JPEG, PNG ou WebP.',
+      );
+    }
+
+    const user = await this.findUser(userId);
+    const key = `avatars/${userId}/${randomUUID()}.${type.ext}`;
+    await this.storage.put(key, file.buffer, type.mime);
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarKey: key },
+    });
+    await this.removeObject(user.avatarKey);
+    return this.publicUser(updated);
+  }
+
+  async removeAvatar(userId: number): Promise<PublicUser> {
+    const user = await this.findUser(userId);
+    if (!user.avatarKey) return this.publicUser(user);
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarKey: null },
+    });
+    await this.removeObject(user.avatarKey);
+    return this.publicUser(updated);
+  }
+
+  private async findUser(userId: number): Promise<User> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+    return user;
+  }
+
+  /** Deleting the old file is best effort: a leftover object never fails the request. */
+  private async removeObject(key: string | null) {
+    if (!key) return;
+    try {
+      await this.storage.remove(key);
+    } catch (err) {
+      this.logger.warn(`Could not delete ${key}: ${(err as Error).message}`);
+    }
+  }
+
+  private async publicUser(user: User): Promise<PublicUser> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash, avatarKey, ...rest } = user;
+    return {
+      ...rest,
+      avatarUrl: avatarKey ? await this.storage.url(avatarKey) : null,
+    };
+  }
+
   private async issueToken(user: User): Promise<AuthResult> {
     const payload: JwtPayload = { sub: user.id, email: user.email };
     return {
       accessToken: await this.jwt.signAsync(payload),
       expiresIn: Number(this.config.get('JWT_EXPIRES_IN', 86400)),
-      user: toPublicUser(user),
+      user: await this.publicUser(user),
     };
   }
-}
-
-function toPublicUser(user: User): PublicUser {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { passwordHash, ...rest } = user;
-  return rest;
 }
