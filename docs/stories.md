@@ -59,6 +59,7 @@ Aucune (US01–US02 déjà construites).
 - [ ] Un écran dont un champ obligatoire est vide ou invalide ne passe pas au suivant et affiche le message sur le champ concerné ; rien n'est enregistré pour cet écran.
 - [ ] Un téléphone professionnel invalide est refusé (même règle que le téléphone d'une commande) ; une plage d'heures d'appel de moins d'une heure est refusée.
 - [ ] À la fin du parcours, le commerçant arrive sur le tableau de bord et la boutique est marquée « onboarding terminé ».
+- [ ] Les comptes créés avant cette story (rattachés à la boutique par défaut en s01) passent eux aussi par l'onboarding à leur prochaine connexion.
 - [ ] Ces informations appartiennent à la boutique du commerçant connecté et sont invisibles pour les autres boutiques.
 
 ### Dependencies
@@ -150,12 +151,14 @@ s01-boutique-privee.
 - [ ] Pour une commande donnée, le script généré contient : le nom de la boutique, l'annonce d'un appel automatisé, le prénom du client, le numéro de commande, les articles et quantités, et le total en TND.
 - [ ] Le script est généré dans la langue par défaut de la boutique (tunisien, français ou anglais).
 - [ ] Le message d'accueil personnalisé de la boutique est utilisé quand il existe ; sinon un message par défaut.
-- [ ] Une commande sans téléphone valide ne produit pas de script et est signalée.
+- [ ] Une commande sans téléphone valide ne produit pas de script : l'API répond une erreur 422 qui nomme le champ `phone`.
+- [ ] Dans les réglages de l'agent, un aperçu affiche le script tel qu'il sera prononcé pour une commande d'exemple, et se met à jour quand la langue ou le message d'accueil change.
 
 ### Dependencies
 s02-onboarding-boutique, s04-parametres-agent.
 
 ### Agentic notes
+- L'aperçu dans les réglages rend la story visible sans fournisseur vocal : c'est ce qui en fait une tranche livrable.
 - Données : `Order` (`customer`, `phone`, `item`, `quantity`, `total` en `Decimal`) dans `schema.prisma`.
 - L'annonce d'appel automatisé est une contrainte du PRD (consentement) : elle n'est pas désactivable.
 - Tester le rendu du script comme une fonction pure, sans fournisseur vocal.
@@ -171,9 +174,9 @@ s02-onboarding-boutique, s04-parametres-agent.
 
 ### Acceptance criteria
 - [ ] Mettre une commande en file déclenche un appel via le fournisseur vocal avec le script de s06 ; l'identifiant d'appel du fournisseur est enregistré sur l'appel.
-- [ ] Hors des heures d'appel de la boutique, l'appel n'est pas passé et reste en attente jusqu'à l'ouverture de la plage.
+- [ ] Hors des heures d'appel de la boutique, l'appel n'est pas passé : il reste à l'état « en attente » et l'interface l'indique. Sa reprise automatique à l'ouverture de la plage relève de s11.
 - [ ] En environnement de développement et de test, un fournisseur simulé remplace le vrai et produit un appel traçable.
-- [ ] Une erreur du fournisseur au lancement passe l'appel à l'état « échec » avec la raison enregistrée.
+- [ ] Une erreur du fournisseur au lancement passe l'appel à l'état « échec » avec la raison enregistrée (erreurs de lancement uniquement ; les échecs en cours d'appel et les relances relèvent de s12).
 
 ### Dependencies
 s06-script-appel.
@@ -221,12 +224,13 @@ s07-appel-commande.
 ### Acceptance criteria
 - [ ] Un jeu de 50 scénarios de réponses en darija et en français (confirmation, annulation, ambiguïté) est versionné dans le dépôt.
 - [ ] Sur ce jeu, au moins 90 % des décisions sont correctement classées (critère de succès du PRD) ; la mesure est une commande reproductible.
-- [ ] Si le client répond dans une autre langue que celle de l'accueil, l'agent continue dans la langue du client.
+- [ ] La langue détectée de la réponse du client est enregistrée sur l'appel, et les consignes envoyées au fournisseur demandent de poursuivre dans la langue du client ; les deux sont vérifiés avec le fournisseur simulé.
 
 ### Dependencies
 s08-resultat-appel.
 
 ### Agentic notes
+- La catégorie « ambiguë » est introduite par s10 ; en s09 les scénarios ambigus sont versionnés mais mesurés seulement après s10.
 - Risque (4) : dépend de la qualité du fournisseur et du modèle ; la mesure doit tourner sur des transcriptions enregistrées, pas sur de vrais appels.
 - Le jeu de scénarios sert aussi de non-régression quand le script ou le fournisseur change.
 
@@ -244,11 +248,11 @@ s08-resultat-appel.
 - [ ] Une réponse claire après une clarification est traitée comme en s08.
 
 ### Dependencies
-s08-resultat-appel.
+s08-resultat-appel, s09-conversation-tunisien.
 
 ### Agentic notes
 - Les scénarios ambigus du jeu de s09 couvrent ce cas ; ajouter les cas de répétition.
-- « À traiter » : réutiliser le même marqueur que s12 (définir le champ une seule fois).
+- s10 crée le marqueur « à traiter » sur la commande (migration) ; s12 le réutilise sans le redéfinir.
 
 ---
 
@@ -266,7 +270,7 @@ s08-resultat-appel.
 - [ ] Une commande créée hors des heures d'appel est appelée à l'ouverture de la plage suivante.
 
 ### Dependencies
-s07-appel-commande.
+s05-essai-gratuit, s07-appel-commande.
 
 ### Agentic notes
 - Risque (4) : ajoute un service de file (ex. Redis) à `docker-compose.yml` et un processus de traitement ; unicité d'un appel actif garantie en base.
@@ -288,11 +292,12 @@ s07-appel-commande.
 - [ ] Un appel échoué (erreur technique, numéro invalide) est enregistré « échec » avec sa raison et n'est pas relancé automatiquement si la raison est un numéro invalide.
 
 ### Dependencies
-s04-parametres-agent, s11-appels-automatiques.
+s04-parametres-agent, s08-resultat-appel, s10-reponse-ambigue, s11-appels-automatiques.
 
 ### Agentic notes
 - Relances : tâches différées dans la file de s11.
 - Les statuts `no_answer` et `failed` existent déjà dans `Call.status`.
+- Le marqueur « à traiter » est celui créé en s10 : ne pas le redéfinir.
 - Équivalent AS-IS : étape 3, « l'appel doit être replanifié à la main ».
 
 ---
