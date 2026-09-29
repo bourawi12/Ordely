@@ -194,14 +194,37 @@ export const api = {
       { auth: false },
     ),
   me: () => request<User>("/auth/me"),
-  boutique: () => request<Boutique>("/boutique"),
-  updateBoutique: (section: BoutiqueSection, data: Record<string, unknown>) =>
-    request<Boutique>(`/boutique/${section}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }),
-  completeOnboarding: () =>
-    request<Boutique>("/boutique/onboarding/complete", { method: "POST" }),
+
+updateProfile: (data: { name: string }) =>
+  request<User>("/auth/profile", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  }),
+
+changePassword: (data: {
+  currentPassword: string;
+  newPassword: string;
+}) =>
+  request<{ success: boolean }>("/auth/change-password", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  }),
+
+boutique: () => request<Boutique>("/boutique"),
+
+updateBoutique: (
+  section: BoutiqueSection,
+  data: Record<string, unknown>,
+) =>
+  request<Boutique>(`/boutique/${section}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  }),
+
+completeOnboarding: () =>
+  request<Boutique>("/boutique/onboarding/complete", {
+    method: "POST",
+  }),
   dashboard: () => request<DashboardSummary>("/dashboard/summary"),
   usage: () => request<Usage>("/calls/usage"),
   listCalls: (filters: CallFilters) =>
