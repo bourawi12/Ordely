@@ -89,6 +89,17 @@ This repository contains the Ordely web app: a NestJS API, a Next.js dashboard a
 docker compose up -d --build
 ```
 
+This builds the **production** images: code changes only show up after another `--build`.
+For development with live reload inside Docker, add the dev file:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
+
+Your `backend/` and `frontend/` folders are mounted into the containers, which run
+`nest start --watch` and `next dev`: a saved file is live in a few seconds. Rebuild (`--build`,
+plus `-V` to refresh `node_modules`) only after changing a `package.json`.
+
 A root `.env` with `JWT_SECRET` is required (see [.env.example](.env.example));
 host ports, database name and credentials can be overridden there too. Data is kept in the `db-data` volume;
 `docker compose down -v` wipes it.

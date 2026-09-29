@@ -1,14 +1,19 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthThrottlerGuard } from './auth-throttler.guard';
+import { AUTH_UPLOAD_LIMIT_BYTES } from './auth.constants';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -58,5 +63,26 @@ export class AuthController {
     @Body() dto: ChangePasswordDto,
   ) {
     return this.authService.changePassword(user.sub, dto);
+  }
+
+  /** multipart/form-data with the image in the "file" field. */
+  @Post('avatar')
+  @HttpCode(200)
+  @UseInterceptors(
+    // Hard cap while reading the body; the 2 MB rule is enforced with a clear message in the service.
+    FileInterceptor('file', {
+      limits: { fileSize: AUTH_UPLOAD_LIMIT_BYTES, files: 1 },
+    }),
+  )
+  uploadAvatar(
+    @CurrentUser() user: JwtPayload,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    return this.authService.uploadAvatar(user.sub, file);
+  }
+
+  @Delete('avatar')
+  removeAvatar(@CurrentUser() user: JwtPayload) {
+    return this.authService.removeAvatar(user.sub);
   }
 }

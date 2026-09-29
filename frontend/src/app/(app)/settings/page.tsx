@@ -4,6 +4,7 @@ import Icon from "@/components/Icon";
 import ui from "@/components/app/ui.module.css";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { AvatarForm } from "./avatar-form";
 import { PasswordForm, ProfileForm } from "./settings-forms";
 import { SettingsTabs } from "./settings-tabs";
 import styles from "./settings.module.css";
@@ -27,6 +28,7 @@ export default async function SettingsPage() {
                 Gérez les informations d&apos;identification de votre compte.
               </p>
             </div>
+            <AvatarForm name={user.name} avatarUrl={user.avatarUrl} />
             <ProfileForm initialName={user.name} email={user.email} />
           </div>
         }

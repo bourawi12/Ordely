@@ -18,6 +18,26 @@ services:
       timeout: 5s
       retries: 10
 
+  # S3-compatible object storage for user uploads (profile pictures…).
+  # Console: http://localhost:${MINIO_CONSOLE_PORT:-9101}
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ordely}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ordely-minio-secret}
+    ports:
+      - "${MINIO_PORT:-9100}:9000"
+      - "${MINIO_CONSOLE_PORT:-9101}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build: ./backend
     restart: unless-stopped
@@ -26,10 +46,19 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-ordely}:${POSTGRES_PASSWORD:-ordely}@db:5432/${POSTGRES_DB:-ordely}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (e.g. openssl rand -hex 32)}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-86400}
+      # The API talks to MinIO inside the network; browsers load files through
+      # signed URLs on the public address.
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-http://localhost:9100}
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-ordely}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-ordely-minio-secret}
+      S3_BUCKET: ${S3_BUCKET:-ordely-media}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     depends_on:
       db:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/health"]
@@ -51,3 +80,4 @@ services:
 
 volumes:
   db-data:
+  minio-data:

@@ -24,7 +24,7 @@ export default function AuthForm({ mode, next, notice }: AuthFormProps) {
       <h1>{isLogin ? "Connexion" : "Créer un compte"}</h1>
       <p className={styles.subtitle}>
         {isLogin
-          ? "Accédez à votre tableau de bord Ordely."
+          ? "Accédez à votre tableau de bord Ordely ."
           : "Commencez à confirmer vos commandes en quelques minutes."}
       </p>
 

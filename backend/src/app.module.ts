@@ -9,6 +9,7 @@ import { CallsModule } from './calls/calls.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { PrismaModule } from './prisma/prisma.module';
     // Limits are set per route with @Throttle(); only auth routes apply the guard.
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     PrismaModule,
+    StorageModule,
     AuthModule,
     BoutiqueModule,
     OrdersModule,
