@@ -32,4 +32,4 @@ jobs:
         run: |
           python scripts/test_binder.py --lang fr-TN --payload tests/fixtures/sample_payload_tn.json
           python scripts/test_binder.py --lang aeb-TN --payload tests/fixtures/sample_payload_tn.json
-          python scripts/test_binder.py --lang ar-TN --payload tests/fixtures/sample_payload_tn.json
+          python scripts/test_binder.py --lang ar-TN --payload tests/fixtures/sample_payload_tn.JSON
