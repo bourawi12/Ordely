@@ -1,0 +1,35 @@
+name: Validate Ordely Specs & Payload Schemas
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate JSON Schema with ajv-cli
+        run: |
+          npm install -g ajv-cli ajv-formats
+          ajv validate -s schemas/call_payload_schema.json -d tests/fixtures/sample_payload_tn.json --all-errors -c ajv-formats
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Script Binder Simulation Tests
+        run: |
+          python scripts/test_binder.py --lang fr-TN --payload tests/fixtures/sample_payload_tn.json
+          python scripts/test_binder.py --lang aeb-TN --payload tests/fixtures/sample_payload_tn.json
+          python scripts/test_binder.py --lang ar-TN --payload tests/fixtures/sample_payload_tn.json

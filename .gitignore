@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Antigravity & Kilo IDE temporary files
+.kilo/
+.kilocode/
+build/
+*.log
+
+# Python Virtual Environments
+.venv/
+venv/
+ENV/

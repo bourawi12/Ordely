@@ -1,0 +1,69 @@
+{
+  "call_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "call_config": {
+    "language": "aeb-TN",
+    "allow_dynamic_language_switch": true,
+    "script_version": "2.0.0",
+    "max_retries": 2,
+    "retry_interval_minutes": 30,
+    "call_window": {
+      "start": "08:30",
+      "end": "19:30",
+      "timezone": "Africa/Tunis"
+    },
+    "record_call": true,
+    "silence_timeout_ms": 5000,
+    "sentiment_escalation_threshold": -0.6
+  },
+  "company": {
+    "name": "TechDistrib Tunisie",
+    "support_phone_number": "+21671123456",
+    "support_email": "support@techdistrib.tn"
+  },
+  "customer": {
+    "customer_id": "CUST-TN-8847",
+    "first_name": "Amira",
+    "last_name": "Ben Ali",
+    "company_name": "Société Pro IT Tunis",
+    "phone": "+21655123456",
+    "email": "amira.benali@proit.tn",
+    "preferred_language": "aeb-TN"
+  },
+  "order": {
+    "order_id": "CMD-2026-04521",
+    "order_date": "2026-09-28",
+    "items": [
+      {
+        "item_id": "SKU-USB-C-001",
+        "name": "Câble USB-C Premium",
+        "quantity": 3,
+        "unit_price": 35.500,
+        "unit_price_incl_tax": 35.500,
+        "line_total": 106.500
+      },
+      {
+        "item_id": "SKU-ADAPT-65W",
+        "name": "Adaptateur secteur 65W",
+        "quantity": 1,
+        "unit_price": 89.900,
+        "unit_price_incl_tax": 89.900,
+        "line_total": 89.900
+      }
+    ],
+    "total_price": 196.400,
+    "currency": "TND",
+    "tax_amount": 31.350,
+    "estimated_delivery_date": "2026-10-03",
+    "shipping_method": "Aramex Tunisia",
+    "pending_orders_count": 1
+  },
+  "telephony": {
+    "caller_id": "+21671800900",
+    "fallback_operator_queue": "queue_support_tn_l1",
+    "escalation_queue": "queue_support_tn_l2"
+  },
+  "metadata": {
+    "source_system": "odoo_tn",
+    "inpdp_consent_logged": true
+  }
+}

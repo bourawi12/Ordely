@@ -1,0 +1,23 @@
+{
+  "name": "ordely-voice-agent",
+  "version": "2.0.0",
+  "description": "Ordely — Voice AI B2B Order Confirmation Agent for Tunisia",
+  "main": "index.js",
+  "scripts": {
+    "validate-schema": "ajv validate -s schemas/call_payload_schema.json -d tests/fixtures/sample_payload_tn.json --all-errors -c ajv-formats",
+    "test": "npm run validate-schema"
+  },
+  "keywords": [
+    "voice-ai",
+    "ordely",
+    "tunisia",
+    "order-confirmation",
+    "json-schema"
+  ],
+  "author": "Ordely Engineering",
+  "license": "MIT",
+  "devDependencies": {
+    "ajv-cli": "^5.0.0",
+    "ajv-formats": "^3.0.1"
+  }
+}
