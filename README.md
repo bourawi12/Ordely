@@ -152,8 +152,8 @@ npm run db:seed -- --reset   # replaces ALL orders and calls
 ### API
 
 - `GET /api/health` — reports app and database status (public)
-- `POST /api/auth/register` `{ email, name, password }` · `POST /api/auth/login` `{ email, password }` (public)
-- `GET /api/auth/me`
+- `POST /api/auth/register` `{ email, name, password, accentColor?, themeMode? }` (`accentColor` is `#rrggbb`, `themeMode` is `system`, `light` or `dark`) · `POST /api/auth/login` `{ email, password }` (public)
+- `GET /api/auth/me` · `PATCH /api/auth/appearance` `{ accentColor?, themeMode? }` (`accentColor: null` goes back to the Ordely blue)
 - `GET /api/dashboard/summary` — 30-day stats, 7-day confirmations, recent calls, pending orders
 - `GET /api/calls?status=&search=&range=today|7d|30d|all&page=` · `GET /api/calls/export` (CSV) · `GET /api/calls/:id`
 - `POST /api/calls` `{ orderId }` queues a call · `POST /api/calls/queue-pending` · `GET /api/calls/usage`

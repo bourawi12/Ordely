@@ -74,8 +74,33 @@ describe('AuthService', () => {
 
     expect($transaction).toHaveBeenCalledTimes(1);
     expect(boutique.create).toHaveBeenCalledTimes(1);
-    expect(user.create.mock.calls[0][0].data.boutiqueId).toBe(42);
+    expect(user.create.mock.calls[0][0].data).toMatchObject({
+      boutiqueId: 42,
+      // No look chosen: Ordely blue, following the device theme.
+      accentColor: null,
+      themeMode: 'system',
+    });
     expect(result.user).toMatchObject({ boutiqueId: 42 });
+  });
+
+  it('saves the accent colour and theme chosen at sign-up', async () => {
+    boutique.create.mockResolvedValue({ id: 42 });
+    user.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 1, createdAt: new Date(), ...data }),
+    );
+
+    const result = await service.register({
+      email: 'ada@example.com',
+      name: 'Ada',
+      password: 'correct horse',
+      accentColor: '#7c3aed',
+      themeMode: 'dark',
+    });
+
+    expect(result.user).toMatchObject({
+      accentColor: '#7c3aed',
+      themeMode: 'dark',
+    });
   });
 
   it('registers a user with a hashed password and never returns the hash', async () => {
@@ -169,6 +194,31 @@ describe('AuthService', () => {
     });
   });
 
+  it('changes the theme, resets the accent with null and leaves omitted fields alone', async () => {
+    user.findUnique.mockResolvedValue({ id: 1 });
+    user.update.mockImplementation(({ data }) =>
+      Promise.resolve({
+        id: 1,
+        email: 'ada@example.com',
+        name: 'Ada',
+        ...data,
+      }),
+    );
+
+    await service.updateAppearance(1, { themeMode: 'dark' });
+    expect(user.update.mock.calls[0][0].data).toEqual({
+      accentColor: undefined,
+      themeMode: 'dark',
+    });
+
+    const result = await service.updateAppearance(1, { accentColor: null });
+    expect(user.update.mock.calls[1][0].data).toEqual({
+      accentColor: null,
+      themeMode: undefined,
+    });
+    expect(result).toMatchObject({ accentColor: null, avatarUrl: null });
+  });
+
   it('changes password when current password matches', async () => {
     const oldHash = await bcrypt.hash('old-password', 4);
     user.findUnique.mockResolvedValue({
@@ -248,14 +298,14 @@ describe('AuthService', () => {
       const text = Buffer.from('<?php echo "hi"; ?>');
       await expect(
         service.uploadAvatar(1, { buffer: text, size: text.length }),
-      ).rejects.toThrow('Format non pris en charge');
+      ).rejects.toThrow('Unsupported format');
       expect(storage.put).not.toHaveBeenCalled();
     });
 
     it('refuses images over 2 MB', async () => {
       await expect(
         service.uploadAvatar(1, { buffer: PNG, size: 2 * 1024 * 1024 + 1 }),
-      ).rejects.toThrow('2 Mo');
+      ).rejects.toThrow('2 MB');
       expect(storage.put).not.toHaveBeenCalled();
     });
   });

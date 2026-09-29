@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import AppShell from "@/components/app/AppShell";
 import { api } from "@/lib/api";
 import { stepHref } from "@/lib/onboarding";
+import { accentStyle, themeClass } from "@/lib/theme";
 
 export default async function AppLayout({
   children,
@@ -21,8 +22,14 @@ export default async function AppLayout({
   }
 
   return (
-    <AppShell user={user} usage={usage}>
-      {children}
-    </AppShell>
+    <div
+      className={`theme-scope ${themeClass(user.themeMode)}`}
+      // The user's accent colour: CSS variables, computed for both themes.
+      style={accentStyle(user.accentColor)}
+    >
+      <AppShell user={user} usage={usage}>
+        {children}
+      </AppShell>
+    </div>
   );
 }

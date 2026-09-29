@@ -212,7 +212,7 @@
   height: 44px;
   overflow: hidden;
   border-radius: 10px;
-  background: linear-gradient(135deg, #1e63ff, #0b1f44);
+  background: linear-gradient(135deg, var(--accent), #0b1f44);
   color: #fff;
   font-weight: 600;
   font-size: 0.95rem;

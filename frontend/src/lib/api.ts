@@ -1,6 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { getSessionToken } from "./session";
+import type { ThemeMode } from "./theme";
 
 export type OrderStatus = "pending" | "confirmed" | "cancelled";
 export type CallStatus = "pending" | "confirmed" | "failed" | "no_answer";
@@ -90,6 +91,9 @@ export interface User {
   name: string;
   /** Signed, short-lived URL of the profile picture (stored in MinIO), or null. */
   avatarUrl: string | null;
+  /** "#rrggbb", or null for the Ordely blue. */
+  accentColor: string | null;
+  themeMode: ThemeMode;
   createdAt: string;
 }
 
@@ -134,8 +138,9 @@ async function send(
   path: string,
   init: RequestInit | undefined,
   auth: boolean,
+  explicitToken?: string,
 ): Promise<Response> {
-  const token = auth ? await getSessionToken() : undefined;
+  const token = explicitToken ?? (auth ? await getSessionToken() : undefined);
   const res = await fetch(`${BACKEND_URL}${path}`, {
     ...init,
     headers: {
@@ -167,9 +172,10 @@ async function send(
 async function request<T>(
   path: string,
   init?: RequestInit,
-  { auth = true }: { auth?: boolean } = {},
+  // `token` stands in for the session cookie, e.g. right after sign-up in the same request.
+  { auth = true, token }: { auth?: boolean; token?: string } = {},
 ): Promise<T> {
-  const res = await send(path, init, auth);
+  const res = await send(path, init, auth, token);
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
@@ -190,7 +196,13 @@ export const api = {
       { method: "POST", body: JSON.stringify(data) },
       { auth: false },
     ),
-  register: (data: { email: string; name: string; password: string }) =>
+  register: (data: {
+    email: string;
+    name: string;
+    password: string;
+    accentColor?: string;
+    themeMode?: ThemeMode;
+  }) =>
     request<AuthResult>(
       "/auth/register",
       { method: "POST", body: JSON.stringify(data) },
@@ -199,9 +211,15 @@ export const api = {
   me: () => request<User>("/auth/me"),
 
   /** multipart body with the image in the "file" field. */
-  uploadAvatar: (form: FormData) =>
-    request<User>("/auth/avatar", { method: "POST", body: form }),
+  uploadAvatar: (form: FormData, token?: string) =>
+    request<User>("/auth/avatar", { method: "POST", body: form }, { token }),
   removeAvatar: () => request<User>("/auth/avatar", { method: "DELETE" }),
+  /** accentColor null goes back to the Ordely blue. */
+  updateAppearance: (data: { accentColor: string | null; themeMode: ThemeMode }) =>
+    request<User>("/auth/appearance", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 updateProfile: (data: { name: string }) =>
   request<User>("/auth/profile", {
     method: "PATCH",

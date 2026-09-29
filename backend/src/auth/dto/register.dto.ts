@@ -1,11 +1,15 @@
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
+  IsIn,
   IsNotEmpty,
+  IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { HEX_COLOR, THEME_MODES, ThemeMode } from '../theme';
 
 export class RegisterDto {
   @Transform(({ value }) =>
@@ -25,4 +29,16 @@ export class RegisterDto {
   @MinLength(8)
   @MaxLength(72)
   password: string;
+
+  // Look chosen on the first sign-up screen; both optional.
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
+  @Matches(HEX_COLOR, { message: 'accentColor must be a #RRGGBB colour' })
+  accentColor?: string;
+
+  @IsOptional()
+  @IsIn(THEME_MODES)
+  themeMode?: ThemeMode;
 }

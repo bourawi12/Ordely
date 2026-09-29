@@ -1,4 +1,6 @@
 .page {
+  /* Light-only design, whatever the device theme. */
+  color-scheme: light;
   --blue: #1e63ff;
   --navy: #0b1f44;
   --sky: #e8f1ff;
@@ -23,6 +25,12 @@
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
+  transition: max-width 0.25s ease;
+}
+
+/* The sign-up personalization screen needs room for three theme cards. */
+.panel:has([data-wide]) {
+  max-width: 600px;
 }
 
 .logo {

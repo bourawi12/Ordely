@@ -16,6 +16,7 @@ import { StorageService } from '../storage/storage.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateAppearanceDto } from './dto/update-appearance.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtPayload } from './jwt-payload';
 
@@ -60,6 +61,8 @@ export class AuthService {
             name: dto.name,
             passwordHash,
             boutiqueId: boutique.id,
+            accentColor: dto.accentColor ?? null,
+            themeMode: dto.themeMode ?? 'system',
           },
         });
       });
@@ -114,6 +117,20 @@ export class AuthService {
     return this.publicUser(updated);
   }
 
+  /** Accent colour (null = the Ordely blue) and light/dark theme. */
+  async updateAppearance(
+    userId: number,
+    dto: UpdateAppearanceDto,
+  ): Promise<PublicUser> {
+    await this.findUser(userId);
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      // undefined leaves a column as it is; null resets the accent.
+      data: { accentColor: dto.accentColor, themeMode: dto.themeMode },
+    });
+    return this.publicUser(updated);
+  }
+
   async changePassword(
     userId: number,
     dto: ChangePasswordDto,
@@ -140,15 +157,15 @@ export class AuthService {
     file: { buffer: Buffer; size: number } | undefined,
   ): Promise<PublicUser> {
     if (!file?.buffer?.length) {
-      throw new BadRequestException('Choisissez une image à envoyer.');
+      throw new BadRequestException('Choose an image to upload.');
     }
     if (file.size > AVATAR_MAX_BYTES) {
-      throw new BadRequestException("L'image dépasse 2 Mo.");
+      throw new BadRequestException('The image is larger than 2 MB.');
     }
     const type = detectImageType(file.buffer);
     if (!type) {
       throw new BadRequestException(
-        'Format non pris en charge. Utilisez une image JPEG, PNG ou WebP.',
+        'Unsupported format. Use a JPEG, PNG or WebP image.',
       );
     }
 

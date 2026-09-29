@@ -19,6 +19,7 @@ import { CurrentUser } from './current-user.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateAppearanceDto } from './dto/update-appearance.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtPayload } from './jwt-payload';
 import { Public } from './public.decorator';
@@ -55,6 +56,14 @@ export class AuthController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.authService.updateProfile(user.sub, dto);
+  }
+
+  @Patch('appearance')
+  updateAppearance(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdateAppearanceDto,
+  ) {
+    return this.authService.updateAppearance(user.sub, dto);
   }
 
   @Patch('change-password')

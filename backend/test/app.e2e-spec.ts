@@ -95,6 +95,40 @@ describe('App (e2e)', () => {
         .expect((res) => expect(res.body.email).toBe(email));
     });
 
+    it('stores the look chosen at sign-up and refuses a bad colour', async () => {
+      const server = app.getHttpServer();
+      const themed = `themed-${email}`;
+      await request(server)
+        .post('/auth/register')
+        .send({
+          email: themed,
+          name: 'Themed',
+          password: 'password123',
+          accentColor: 'purple',
+        })
+        .expect(400);
+      const res = await request(server)
+        .post('/auth/register')
+        .send({
+          email: themed,
+          name: 'Themed',
+          password: 'password123',
+          accentColor: '#7C3AED',
+          themeMode: 'dark',
+        })
+        .expect(201);
+      expect(res.body.user).toMatchObject({
+        accentColor: '#7c3aed',
+        themeMode: 'dark',
+      });
+
+      const created = await prisma.user.findUniqueOrThrow({
+        where: { email: themed },
+      });
+      await prisma.user.delete({ where: { id: created.id } });
+      await prisma.boutique.delete({ where: { id: created.boutiqueId } });
+    });
+
     it('rejects weak registrations', () => {
       return request(app.getHttpServer())
         .post('/auth/register')
@@ -239,6 +273,45 @@ describe('App (e2e)', () => {
         .expect(200)
         .expect((res) => expect(res.body.avatarUrl).toBeNull());
       expect((await fetch(url)).status).toBe(404);
+    });
+  });
+
+  describe('appearance', () => {
+    it('changes theme and accent, resets the accent with null, refuses bad values', async () => {
+      const server = app.getHttpServer();
+      const auth = { Authorization: `Bearer ${token}` };
+
+      await request(server)
+        .patch('/auth/appearance')
+        .set(auth)
+        .send({ themeMode: 'sepia' })
+        .expect(400);
+      await request(server)
+        .patch('/auth/appearance')
+        .set(auth)
+        .send({ accentColor: 'red' })
+        .expect(400);
+
+      await request(server)
+        .patch('/auth/appearance')
+        .set(auth)
+        .send({ accentColor: '#0D9488', themeMode: 'dark' })
+        .expect(200)
+        .expect((res) =>
+          expect(res.body).toMatchObject({
+            accentColor: '#0d9488',
+            themeMode: 'dark',
+          }),
+        );
+
+      // null goes back to the Ordely blue; the omitted theme stays dark.
+      await request(server)
+        .patch('/auth/appearance')
+        .set(auth)
+        .send({ accentColor: null })
+        .expect(200);
+      const me = await request(server).get('/auth/me').set(auth).expect(200);
+      expect(me.body).toMatchObject({ accentColor: null, themeMode: 'dark' });
     });
   });
 

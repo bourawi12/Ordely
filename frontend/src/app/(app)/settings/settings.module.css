@@ -1,247 +1,490 @@
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: 1.75rem;
-  max-width: 680px;
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.label {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.hint {
-  font-size: 0.8rem;
-  color: var(--muted);
-  font-weight: 400;
-}
-
-.input {
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.95rem;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
-}
-
-.inputDisabled {
-  background: var(--track);
-  color: var(--muted);
-  cursor: not-allowed;
-  border-color: var(--border);
-}
-
-.alertSuccess {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  background: var(--success-bg);
-  color: var(--success-text);
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
-.alertError {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  background: var(--fail-bg);
-  color: var(--fail-text);
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 0.5rem;
-}
-
-.footerSection {
-  margin-top: 0.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-/* ── Tabs layout ─────────────────────────────────────── */
-.tabsWrapper {
-  width: 100%;
-}
-
-.tabNav {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px;
-  margin-bottom: 24px;
-
-  background: #f5f7fa;
-  border-radius: 12px;
-  width: fit-content;
-}
-
-.tabBtn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-
-  background: transparent;
-  color: #667085;
-
-  font-size: 14px;
-  font-weight: 500;
-
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.tabBtn:hover {
-  background: var(--surface);
-  color: var(--text);
-}
-
-.tabBtnActive {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.tabPanel {
-  flex: 1;
-  min-width: 0;
-}
-
-/* ── Panel header ─────────────────────────────────────── */
-.panelHeader {
-  margin-bottom: 1.5rem;
-}
-
-.panelTitle {
-  margin: 0 0 0.35rem;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.panelDesc {
-  margin: 0;
-  font-size: 0.88rem;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-/* ── Session grid ─────────────────────────────────────── */
-.sessionGrid {
+/* Settings: who is signed in and the section menu on the left, the open section on the right.
+   Tokens only (globals.css), so every theme and accent colour applies. */
+.layout {
   display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.75rem 1.5rem;
-  margin: 0 0 1.25rem;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+  max-width: 1100px;
 }
 
-.sessionGrid dd {
-  margin: 0;
-  font-weight: 500;
+/* ---------- Menu ---------- */
+.aside {
+  position: sticky;
+  top: 1.5rem;
+  padding: 0.75rem;
 }
 
-/* ---------- Profile picture ---------- */
-.avatarBlock {
+.me {
   display: flex;
-  align-items: flex-start;
-  gap: 1.25rem;
-  margin-bottom: 1.75rem;
-  padding-bottom: 1.75rem;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.5rem 1rem;
   border-bottom: 1px solid var(--border);
 }
 
-.avatarPreview {
+.meAvatar {
   flex: none;
   display: grid;
   place-items: center;
-  width: 88px;
-  height: 88px;
+  width: 44px;
+  height: 44px;
   overflow: hidden;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #1e63ff, #0b1f44);
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #0b1f44);
   color: #fff;
-  font-size: 1.6rem;
   font-weight: 600;
 }
 
-.avatarPreview img {
+.meAvatar img,
+.avatarBig img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.avatarBody {
+.meText {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
   min-width: 0;
 }
 
-.avatarTitle {
-  margin: 0;
+.meText strong,
+.meText span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meText strong {
   font-weight: 600;
 }
 
-.avatarActions,
-.avatarUpload {
+.meText span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.navLink {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 10px;
+  color: var(--text);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.navLink:hover {
+  background: var(--app-bg);
+}
+
+.navLink[aria-current="page"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.navIcon {
+  flex: none;
+  margin-top: 1px;
+}
+
+.navText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.navLabel {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.navDesc {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* ---------- Section ---------- */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+  max-width: 760px;
+}
+
+.pageHead h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.pageHead p {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+}
+
+/* ---------- Cards: body, then a footer with the save status and the actions ---------- */
+.card {
+  overflow: hidden;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem 1.75rem;
+}
+
+.cardHead h3 {
+  margin: 0;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.cardHead p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.cardFoot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0.9rem 1.75rem;
+  border-top: 1px solid var(--border);
+  background: var(--app-bg);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.status svg {
+  flex: none;
+}
+
+.status[data-tone="success"] {
+  color: var(--success-text);
+  font-weight: 500;
+}
+
+.status[data-tone="error"] {
+  color: var(--fail-text);
+  font-weight: 500;
+}
+
+.footActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+
+/* ---------- Fields ---------- */
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+}
+
+/* Starts a new row, leaving the rest of the previous one empty. */
+.newRow {
+  grid-column-start: 1;
+}
+
+.readonly {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.readonly input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 2.4rem;
+  background: var(--app-bg);
+  color: var(--muted);
+}
+
+.readonly svg {
+  position: absolute;
+  right: 0.8rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* ---------- Profile picture ---------- */
+.avatarCard {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.avatarInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.avatarActions {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.6rem;
 }
 
-.avatarUpload label {
-  /* globals.css stacks every <label>; this one is a button. */
+.fileBtn {
+  /* globals.css stacks every <label> vertically; this one is a button. */
   flex-direction: row;
-  cursor: pointer;
 }
 
-.dangerText {
+.fileBtn[data-disabled],
+.avatarActions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
+
+.danger {
   color: var(--danger);
 }
 
-@media (max-width: 520px) {
-  .avatarBlock {
-    flex-direction: column;
+.danger:hover {
+  border-color: var(--danger);
+}
+
+.avatarBig {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #0b1f44);
+  box-shadow:
+    0 0 0 4px var(--surface),
+    0 0 0 5px var(--border);
+  color: #fff;
+  font-size: 1.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.avatarOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(10 20 40 / 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.avatarBig:hover .avatarOverlay,
+.avatarBig[data-busy] .avatarOverlay {
+  opacity: 1;
+}
+
+.avatarBig[data-busy] {
+  pointer-events: none;
+}
+
+.spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid rgb(255 255 255 / 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Appearance ---------- */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.group legend {
+  margin-bottom: 0.9rem;
+  padding: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.group legend small {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.divider {
+  margin: 0.25rem 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--app-bg);
+}
+
+.preview > * {
+  cursor: default;
+}
+
+.previewLabel {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.previewLink {
+  color: var(--accent);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* ---------- Session ---------- */
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.6rem 2rem;
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Smaller screens ---------- */
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+/* The menu becomes a row of tabs above the section. */
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aside {
+    position: static;
+    padding: 0.4rem;
+  }
+
+  .me,
+  .navDesc {
+    display: none;
+  }
+
+  .nav {
+    flex-direction: row;
+  }
+
+  .navLink {
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 0.55rem 0.75rem;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Three tabs side by side on a phone: labels only. */
+  .navIcon {
+    display: none;
+  }
+
+  .navLabel {
+    font-size: 0.9rem;
+  }
+
+  .cardBody {
+    padding: 1.25rem;
+  }
+
+  .cardFoot {
+    padding: 0.85rem 1.25rem;
+  }
+
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .avatarCard {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+  }
+
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+
+  .facts dd {
+    margin-bottom: 0.6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2s;
   }
 }
