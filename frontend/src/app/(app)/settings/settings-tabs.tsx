@@ -12,7 +12,7 @@ interface Tab {
 
 const TABS: Tab[] = [
   { id: "profile", label: "Profil", icon: "user" },
-  { id: "security", label: "Securite", icon: "lock" },
+  { id: "security", label: "Sécurité", icon: "lock" },
   { id: "session", label: "Session", icon: "monitor" },
 ];
 
@@ -36,36 +36,57 @@ export function SettingsTabs({
   };
 
   return (
-    <div className={styles.tabsWrapper}>
-      <nav className={styles.tabNav} role="tablist" aria-label="Parametres">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            role="tab"
-            aria-selected={active === tab.id}
-            aria-controls={`panel-${tab.id}`}
-            id={`tab-${tab.id}`}
-            onClick={() => setActive(tab.id)}
-            className={`${styles.tabBtn} ${active === tab.id ? styles.tabBtnActive : ""}`}
-          >
-            <Icon name={tab.icon as any} size={16} />
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+    <div>
+      <h1 style={{ color: "blue", fontSize: "40px" }}>
+        TEST SETTINGS TABS
+      </h1>
 
-      {TABS.map((tab) => (
-        <div
-          key={tab.id}
-          id={`panel-${tab.id}`}
-          role="tabpanel"
-          aria-labelledby={`tab-${tab.id}`}
-          hidden={active !== tab.id}
-          className={styles.tabPanel}
+      <div className={styles.tabsWrapper}>
+
+        {/* Mini navbar */}
+        <nav
+          className={styles.tabNav}
+          role="tablist"
+          aria-label="Paramètres"
         >
-          {panels[tab.id]}
+          {TABS.map((tab) => {
+            const isActive = active === tab.id;
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActive(tab.id)}
+                className={`${styles.tabBtn} ${isActive ? styles.tabBtnActive : ""
+                  }`}
+              >
+                <Icon name={tab.icon as any} size={16} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Contenu : uniquement l'onglet actif */}
+        <div className={styles.tabContent}>
+          {TABS.map((tab) => {
+            if (active !== tab.id) {
+              return null;
+            }
+
+            return (
+              <div
+                key={tab.id}
+                className={styles.tabPanel}
+              >
+                {panels[tab.id]}
+              </div>
+            );
+          })}
         </div>
-      ))}
-    </div>
+
+      </div> </div>
   );
 }

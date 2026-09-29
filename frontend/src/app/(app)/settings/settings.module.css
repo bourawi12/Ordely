@@ -106,7 +106,6 @@
   gap: 6px;
   padding: 6px;
   margin-bottom: 24px;
-
   background: #f5f7fa;
   border-radius: 12px;
   width: fit-content;
@@ -116,38 +115,34 @@
   display: flex;
   align-items: center;
   gap: 8px;
-
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
-
   background: transparent;
   color: #667085;
-
   font-size: 14px;
   font-weight: 500;
-
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .tabBtn:hover {
-  background: var(--surface);
-  color: var(--text);
+  background: white;
+  color: #1d2939;
 }
 
 .tabBtnActive {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
+  background: white;
+  color: #111827;
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.tabContent {
+  width: 100%;
 }
 
 .tabPanel {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
 }
-
 /* ── Panel header ─────────────────────────────────────── */
 .panelHeader {
   margin-bottom: 1.5rem;
