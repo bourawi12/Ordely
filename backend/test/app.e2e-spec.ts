@@ -29,7 +29,11 @@ describe('App (e2e)', () => {
   });
 
   afterAll(async () => {
+    const users = await prisma.user.findMany({ where: { email } });
     await prisma.user.deleteMany({ where: { email } });
+    await prisma.boutique.deleteMany({
+      where: { id: { in: users.map((u) => u.boutiqueId) } },
+    });
     await app.close();
   });
 
@@ -92,6 +96,94 @@ describe('App (e2e)', () => {
         .post('/auth/register')
         .send({ email: 'not-an-email', name: '', password: 'short' })
         .expect(400);
+    });
+  });
+
+  describe('boutique onboarding', () => {
+    const auth = () => ({ Authorization: `Bearer ${token}` });
+
+    it('requires identity and agent only, then completes with optional details', async () => {
+      const server = app.getHttpServer();
+      await request(server)
+        .get('/boutique')
+        .set(auth())
+        .expect(200)
+        .expect((res) =>
+          expect(res.body.onboarding).toEqual({
+            completed: false,
+            nextStep: 1,
+          }),
+        );
+
+      // Completing before the required screens is refused.
+      await request(server)
+        .post('/boutique/onboarding/complete')
+        .set(auth())
+        .expect(409);
+
+      await request(server)
+        .patch('/boutique/identity')
+        .set(auth())
+        .send({
+          name: 'Boutique E2E',
+          businessPhone: 'abc',
+          platform: 'shopify',
+        })
+        .expect(400);
+      await request(server)
+        .patch('/boutique/identity')
+        .set(auth())
+        .send({
+          name: 'Boutique E2E',
+          businessPhone: '+216 22 000 000',
+          platform: 'shopify',
+        })
+        .expect(200)
+        .expect((res) => expect(res.body.onboarding.nextStep).toBe(2));
+
+      await request(server)
+        .patch('/boutique/agent')
+        .set(auth())
+        .send({
+          callLanguages: ['darija'],
+          callStartTime: '10:00',
+          callEndTime: '10:30',
+        })
+        .expect(400);
+      await request(server)
+        .patch('/boutique/agent')
+        .set(auth())
+        .send({
+          callLanguages: ['darija', 'french'],
+          callStartTime: '09:00',
+          callEndTime: '20:00',
+        })
+        .expect(200)
+        .expect((res) => expect(res.body.onboarding.nextStep).toBe(3));
+
+      await request(server)
+        .patch('/boutique/details')
+        .set(auth())
+        .send({
+          sector: 'fashion',
+          deliveryZones: ['tunis', 'sfax'],
+          carrier: 'aramex',
+        })
+        .expect(200);
+
+      await request(server)
+        .post('/boutique/onboarding/complete')
+        .set(auth())
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.onboarding.completed).toBe(true);
+          expect(res.body).toMatchObject({
+            name: 'Boutique E2E',
+            callLanguages: ['darija', 'french'],
+            deliveryZones: ['tunis', 'sfax'],
+            carrier: 'aramex',
+          });
+        });
     });
   });
 

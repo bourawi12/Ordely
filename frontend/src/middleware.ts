@@ -22,5 +22,6 @@ export const config = {
     "/analytics/:path*",
     "/integrations/:path*",
     "/settings/:path*",
+    "/onboarding/:path*",
   ],
 };

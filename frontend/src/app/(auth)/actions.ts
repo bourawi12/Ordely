@@ -10,9 +10,13 @@ export interface AuthFormState {
   name?: string;
 }
 
-async function startSession(result: AuthResult, next: FormDataEntryValue | null) {
+async function startSession(
+  result: AuthResult,
+  next: FormDataEntryValue | null,
+  fallback = "/dashboard",
+) {
   await setSession(result.accessToken, result.expiresIn);
-  redirect(safeNextPath(next));
+  redirect(safeNextPath(next, fallback));
 }
 
 function errorMessage(err: unknown): string {
@@ -56,7 +60,8 @@ export async function register(
 
   try {
     const result = await api.register({ email, name, password });
-    await startSession(result, formData.get("next"));
+    // A new account always continues with the short boutique onboarding.
+    await startSession(result, null, "/onboarding");
   } catch (err) {
     unstable_rethrow(err);
     return { error: errorMessage(err), email, name };

@@ -65,4 +65,28 @@ A command left at `—` is one the agents cannot run: they say so rather than gu
 
 ## Project conventions
 
-<< structure, stack, patterns, naming, commit rules — filled by /ks-architect >>
+Stack and decisions: `docs/architecture.md`, ADRs in `docs/decisions/`.
+
+### Backend (`backend/`, NestJS 10 + Prisma 6)
+- One NestJS module per domain in `src/<domain>/`: `<domain>.module.ts`, `<domain>.controller.ts`, `<domain>.service.ts`, `dto/`. Register new modules in `src/app.module.ts`.
+- Controllers stay thin: validate with DTOs, call the service, return its result. Business logic lives in services.
+- Every input goes through a class-validator DTO in `dto/` (the global `ValidationPipe` uses `whitelist`, `forbidNonWhitelisted`, `transform`). Trim strings with `@Transform`; phone numbers use the same `@Matches` rule as `create-order.dto.ts`.
+- Numeric route params use `ParseIntPipe`. Errors are Nest exceptions (`NotFoundException`, `ConflictException`, `UnauthorizedException`…), never custom error payloads.
+- Every route requires a JWT (global `AuthGuard`). Opt out only with `@Public()`, deliberately. Read the user with `@CurrentUser()`.
+- Data access only through the injected `PrismaService`. Multi-row writes that must succeed together use `prisma.$transaction`.
+- Schema changes = a Prisma migration in `prisma/migrations/` (with backfill when rows exist). Never `prisma migrate reset` on a database with data. Update `prisma/seed.ts` when the schema changes.
+- Money is `Decimal(10, 3)` in TND. Dates are `timestamptz`; day boundaries use Africa/Tunis via `src/common/time.ts`.
+- Env values are strings: convert numbers explicitly (`Number(config.get(...))`).
+- Tests: unit `src/**/<name>.spec.ts` with Prisma mocked; e2e in `test/app.e2e-spec.ts` against `DATABASE_URL` (Postgres from `docker compose up -d db`). Style: Prettier (single quotes, trailing commas), `npm run lint`.
+
+### Frontend (`frontend/`, Next.js 15 App Router)
+- Route groups: `(marketing)` landing, `(auth)` login/register, `(app)` signed-in app under the `AppShell` layout. Signed-in routes are also listed in `src/middleware.ts` (cookie presence check).
+- Pages are server components that read data through `src/lib/api.ts` (`server-only`). The browser never calls the API.
+- Writes are server actions in an `actions.ts` next to the route, used from client components with `useActionState`. Catch blocks call `unstable_rethrow(err)` first so redirects pass through; then `revalidatePath` the affected pages.
+- Add every new endpoint to `api` in `src/lib/api.ts` with its TypeScript type.
+- Styles: CSS Modules only, built from the tokens in `src/app/globals.css` (they cover dark mode). App building blocks come from `src/components/app/ui.module.css` (card, table, badge, btn, input); icons from `src/components/Icon.tsx`. No Tailwind, no inline colors.
+- Formatting (TND, durations, Tunis dates) goes through `src/lib/format.ts`. App copy is English; landing and auth pages are French.
+- Never run `next build` in a directory where a `next dev` server is running (they share `.next/`).
+
+### Git
+- Commit messages: conventional prefix (`feat:`, `fix:`, `docs:`, `chore:`) and a short imperative summary.
