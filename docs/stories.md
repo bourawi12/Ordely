@@ -24,7 +24,7 @@ Ordre = ordre de dépendance.
 4 — migration de données et règle d'autorisation transversale.
 
 ### Acceptance criteria
-- [ ] À l'inscription, le commerçant saisit le nom de sa boutique ; un compte, une boutique et le lien entre les deux sont créés ensemble, ou rien n'est créé.
+- [ ] À l'inscription, un compte, une boutique (encore vide, remplie par l'onboarding s02) et le lien entre les deux sont créés ensemble, ou rien n'est créé.
 - [ ] Chaque commande et chaque appel appartient à exactement une boutique.
 - [ ] Un commerçant de la boutique A qui demande une commande ou un appel de la boutique B reçoit 404, dans l'API comme dans l'interface.
 - [ ] Les listes, le tableau de bord, l'export CSV et l'usage ne comptent que les données de la boutique du commerçant connecté.
@@ -37,28 +37,40 @@ Aucune (US01–US02 déjà construites).
 - Risque (4) : une requête oubliée fuit les données d'une autre boutique. Toutes les requêtes Prisma de `backend/src/orders/`, `backend/src/calls/`, `backend/src/dashboard/` doivent être filtrées ; envisager une extension du client Prisma qui l'impose. Tester chaque endpoint en isolation croisée.
 - Schéma : `backend/prisma/schema.prisma` (modèles `Order`, `Call`, `User`). Migration Prisma avec backfill ; ne jamais lancer `prisma migrate reset` sur la base de dev.
 - L'identifiant de boutique se résout dans `backend/src/auth/auth.guard.ts` (payload JWT `sub`).
-- Le formulaire d'inscription est `frontend/src/components/AuthForm.tsx` ; l'action `register` est dans `frontend/src/app/(auth)/actions.ts`.
+- L'action `register` est dans `frontend/src/app/(auth)/actions.ts` ; le formulaire d'inscription (`frontend/src/components/AuthForm.tsx`) ne change pas : le nom de la boutique est demandé par l'onboarding (s02).
 - `prisma/seed.ts` doit créer une boutique de démo.
 
 ---
 
-## Story s02-infos-entreprise — Informations de l'entreprise et coordonnées
-**As a** commerçant **I want** renseigner le nom commercial, le secteur et les coordonnées de ma boutique **so that** l'agent se présente au nom de ma boutique et donne les bonnes coordonnées aux clients (US04, US06).
+## Story s02-onboarding-boutique — Onboarding de la boutique en plusieurs écrans
+**As a** nouveau commerçant **I want** renseigner ma boutique, mon activité et mon agent dans un parcours guidé en plusieurs écrans juste après la création de mon compte **so that** l'agent est configuré pour ma boutique avant son premier appel (US04, US05, US06).
 
 ### Complexity
-2 — formulaire et persistance.
+3 — quatre écrans, persistance étape par étape, accès bloqué tant que les champs obligatoires manquent.
 
 ### Acceptance criteria
-- [ ] Le commerçant enregistre le nom commercial, le secteur d'activité et un numéro de contact de la boutique ; les valeurs sont relues à l'identique après rechargement.
-- [ ] Un numéro de contact invalide est refusé avec un message sur le champ, sans rien enregistrer.
-- [ ] Ces informations sont rattachées à la boutique du commerçant connecté et invisibles pour les autres boutiques.
+- [ ] Juste après la création du compte, le commerçant arrive sur le premier écran de l'onboarding ; tant que les champs obligatoires ne sont pas tous remplis, toute page de l'application (tableau de bord, commandes, journal d'appels, réglages) le renvoie vers l'écran à compléter.
+- [ ] Le parcours compte 4 écrans, dans cet ordre, avec une indication de progression (écran n sur 4), et « Retour » conserve ce qui a été saisi :
+  1. **Identité** : nom de la boutique (obligatoire, distinct du nom personnel), téléphone professionnel (obligatoire, affiché côté client), plateforme utilisée (obligatoire : Shopify, WooCommerce, Facebook/Instagram Shop, site sur mesure, aucune).
+  2. **Contexte métier** : secteur d'activité (obligatoire : mode, cosmétique, électronique, alimentaire, autre), zones de livraison (gouvernorats, choix multiple, ou « toute la Tunisie »), volume moyen de commandes par jour (par tranches).
+  3. **Agent** : langues d'appel (obligatoire, au moins une : darija, français, anglais), heures d'appel autorisées (obligatoire, début et fin, par défaut 09:00–20:00), façon dont les commandes sont confirmées aujourd'hui (équipe interne, prestataire externe, moi-même, pas encore de process).
+  4. **Optionnel** : comment le commerçant a connu Ordely, transporteur habituel (Aramex, DHL, livreur local, autre). Cet écran peut être passé.
+- [ ] Chaque écran est enregistré dès que le commerçant passe au suivant : s'il ferme le navigateur et se reconnecte, il reprend au premier écran incomplet avec ses réponses déjà saisies.
+- [ ] Un écran dont un champ obligatoire est vide ou invalide ne passe pas au suivant et affiche le message sur le champ concerné ; rien n'est enregistré pour cet écran.
+- [ ] Un téléphone professionnel invalide est refusé (même règle que le téléphone d'une commande) ; une plage d'heures d'appel de moins d'une heure est refusée.
+- [ ] À la fin du parcours, le commerçant arrive sur le tableau de bord et la boutique est marquée « onboarding terminé ».
+- [ ] Ces informations appartiennent à la boutique du commerçant connecté et sont invisibles pour les autres boutiques.
 
 ### Dependencies
 s01-boutique-privee.
 
 ### Agentic notes
-- Page existante à étendre : `frontend/src/app/(app)/settings/page.tsx` (lecture seule aujourd'hui).
-- Validation du téléphone : même règle que `backend/src/orders/dto/create-order.dto.ts` (`phone`).
+- Données : champs sur la boutique créée en s01 (`backend/prisma/schema.prisma`), plus un marqueur d'onboarding terminé. Listes fermées (plateforme, secteur, langues, process, transporteur) : valeurs validées côté API, pas de texte libre sauf « autre ».
+- Gouvernorats : la liste officielle des 24 gouvernorats tunisiens, en constante partagée.
+- Blocage : vérifier l'état d'onboarding côté serveur (`frontend/src/app/(app)/layout.tsx`, qui appelle déjà `/auth/me`) et rediriger ; le `middleware.ts` ne voit que le cookie, pas l'état de la boutique.
+- Écrans : nouvelle route hors du shell de l'application (sans barre latérale), dans le style des pages d'authentification (`frontend/src/app/(auth)/`, `auth.module.css`) ; une URL par écran pour que le retour navigateur fonctionne.
+- Les heures d'appel et les langues saisies ici sont les mêmes réglages que ceux modifiables ensuite en s04 : un seul stockage.
+- Le transporteur n'est qu'un renseignement : aucune intégration logistique (cimetière du PRD).
 - Équivalent AS-IS : l'opérateur se présente oralement au nom de la boutique.
 
 ---
@@ -83,22 +95,24 @@ s01-boutique-privee.
 
 ---
 
-## Story s04-parametres-agent — Personnalisation et paramètres de l'agent
-**As a** commerçant **I want** choisir la langue par défaut, la voix, le message d'accueil, les heures d'appel et le nombre maximal de tentatives de l'agent **so that** il communique et appelle comme je le souhaite (US05, US29).
+## Story s04-parametres-agent — Réglages de la boutique et de l'agent
+**As a** commerçant **I want** modifier après l'onboarding les informations de ma boutique et régler finement mon agent (voix, message d'accueil, jours sans appel, tentatives) **so that** il communique et appelle comme je le souhaite (US05, US29).
 
 ### Complexity
 3 — plusieurs réglages avec règles de validation, consommés par les stories d'appel.
 
 ### Acceptance criteria
-- [ ] Le commerçant enregistre : langue par défaut (tunisien, français, anglais), voix, message d'accueil, plage horaire d'appel, jours sans appel, nombre maximal de tentatives, délai entre tentatives.
-- [ ] Une nouvelle boutique a des valeurs par défaut utilisables sans rien configurer.
+- [ ] Depuis les réglages, le commerçant modifie toutes les informations saisies à l'onboarding (s02), avec les mêmes règles de validation.
+- [ ] Il règle aussi : langue par défaut parmi les langues choisies, voix, message d'accueil, jours sans appel, nombre maximal de tentatives, délai entre tentatives.
+- [ ] Les réglages non saisis à l'onboarding ont des valeurs par défaut utilisables sans rien configurer.
 - [ ] Une plage horaire de moins d'une heure, ou un nombre de tentatives hors de 1 à 5, est refusé avec un message clair.
 - [ ] Les heures sont interprétées à l'heure de Tunis (Africa/Tunis).
 
 ### Dependencies
-s01-boutique-privee.
+s02-onboarding-boutique.
 
 ### Agentic notes
+- Réutiliser les formulaires des écrans d'onboarding (s02) plutôt que les dupliquer.
 - Nouvelle page de réglages dans le shell existant (`frontend/src/components/app/AppShell.tsx`, entrée « Settings »).
 - Fuseau : réutiliser `backend/src/common/time.ts` (`DEFAULT_TIMEZONE`).
 - Les listes de voix dépendent du fournisseur vocal (choisi en s07) : stocker un identifiant de voix libre, validé plus tard.
@@ -133,13 +147,13 @@ s01-boutique-privee.
 3 — construction du contexte d'appel à partir de la commande, de la boutique et des réglages.
 
 ### Acceptance criteria
-- [ ] Pour une commande donnée, le script généré contient : le nom commercial de la boutique, l'annonce d'un appel automatisé, le prénom du client, le numéro de commande, les articles et quantités, et le total en TND.
+- [ ] Pour une commande donnée, le script généré contient : le nom de la boutique, l'annonce d'un appel automatisé, le prénom du client, le numéro de commande, les articles et quantités, et le total en TND.
 - [ ] Le script est généré dans la langue par défaut de la boutique (tunisien, français ou anglais).
 - [ ] Le message d'accueil personnalisé de la boutique est utilisé quand il existe ; sinon un message par défaut.
 - [ ] Une commande sans téléphone valide ne produit pas de script et est signalée.
 
 ### Dependencies
-s02-infos-entreprise, s04-parametres-agent.
+s02-onboarding-boutique, s04-parametres-agent.
 
 ### Agentic notes
 - Données : `Order` (`customer`, `phone`, `item`, `quantity`, `total` en `Decimal`) dans `schema.prisma`.
@@ -290,12 +304,12 @@ s04-parametres-agent, s11-appels-automatiques.
 2 — réutilise l'appel de s07 avec une commande fictive.
 
 ### Acceptance criteria
-- [ ] Depuis les réglages de l'agent, le commerçant déclenche un appel test vers le numéro de contact de la boutique, avec le script courant et une commande d'exemple.
+- [ ] Depuis les réglages de l'agent, le commerçant déclenche un appel test vers le téléphone professionnel de la boutique, avec le script courant et une commande d'exemple.
 - [ ] Les appels test n'apparaissent pas dans les statistiques, l'export ni le quota d'essai.
 - [ ] Au plus 5 appels test par boutique et par jour ; au-delà, un message l'explique.
 
 ### Dependencies
-s02-infos-entreprise, s04-parametres-agent, s07-appel-commande.
+s02-onboarding-boutique, s04-parametres-agent, s07-appel-commande.
 
 ### Agentic notes
 - Marquer l'appel comme test plutôt que créer une fausse commande persistée.
