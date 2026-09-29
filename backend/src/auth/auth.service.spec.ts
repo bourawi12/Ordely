@@ -11,13 +11,18 @@ describe('AuthService', () => {
   let service: AuthService;
   let jwt: JwtService;
   const user = { findUnique: jest.fn(), create: jest.fn() };
+  const boutique = { create: jest.fn() };
+  // Registration runs in an interactive transaction: hand the callback the same mocks.
+  const $transaction = jest.fn((fn: (tx: unknown) => unknown) =>
+    fn({ user, boutique }),
+  );
 
   beforeEach(async () => {
     jest.clearAllMocks();
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
-        { provide: PrismaService, useValue: { user } },
+        { provide: PrismaService, useValue: { user, boutique, $transaction } },
         {
           provide: JwtService,
           useValue: new JwtService({ secret: 'test-secret' }),
@@ -36,7 +41,26 @@ describe('AuthService', () => {
     jwt = moduleRef.get(JwtService);
   });
 
+  it('creates the boutique and links the new user to it, in one transaction', async () => {
+    boutique.create.mockResolvedValue({ id: 42 });
+    user.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 1, createdAt: new Date(), ...data }),
+    );
+
+    const result = await service.register({
+      email: 'ada@example.com',
+      name: 'Ada',
+      password: 'correct horse',
+    });
+
+    expect($transaction).toHaveBeenCalledTimes(1);
+    expect(boutique.create).toHaveBeenCalledTimes(1);
+    expect(user.create.mock.calls[0][0].data.boutiqueId).toBe(42);
+    expect(result.user).toMatchObject({ boutiqueId: 42 });
+  });
+
   it('registers a user with a hashed password and never returns the hash', async () => {
+    boutique.create.mockResolvedValue({ id: 42 });
     user.create.mockImplementation(({ data }) =>
       Promise.resolve({ id: 1, createdAt: new Date(), ...data }),
     );
@@ -59,6 +83,7 @@ describe('AuthService', () => {
   });
 
   it('rejects duplicate emails', async () => {
+    boutique.create.mockResolvedValue({ id: 42 });
     user.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('dup', {
         code: 'P2002',

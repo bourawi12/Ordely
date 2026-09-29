@@ -35,8 +35,17 @@ export class AuthService {
   async register(dto: RegisterDto): Promise<AuthResult> {
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     try {
-      const user = await this.prisma.user.create({
-        data: { email: dto.email, name: dto.name, passwordHash },
+      // Every account comes with its own (empty) boutique, filled by the onboarding.
+      const user = await this.prisma.$transaction(async (tx) => {
+        const boutique = await tx.boutique.create({ data: {} });
+        return tx.user.create({
+          data: {
+            email: dto.email,
+            name: dto.name,
+            passwordHash,
+            boutiqueId: boutique.id,
+          },
+        });
       });
       return this.issueToken(user);
     } catch (err) {

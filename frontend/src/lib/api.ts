@@ -91,6 +91,26 @@ export interface User {
   createdAt: string;
 }
 
+export interface Boutique {
+  id: number;
+  name: string | null;
+  businessPhone: string | null;
+  platform: string | null;
+  callLanguages: string[];
+  callStartTime: string | null;
+  callEndTime: string | null;
+  confirmationProcess: string | null;
+  sector: string | null;
+  deliveryZones: string[];
+  dailyOrderVolume: string | null;
+  acquisitionSource: string | null;
+  carrier: string | null;
+  onboardingCompletedAt: string | null;
+  onboarding: { completed: boolean; nextStep: 1 | 2 | 3 };
+}
+
+export type BoutiqueSection = "identity" | "agent" | "details";
+
 export interface AuthResult {
   accessToken: string;
   expiresIn: number;
@@ -174,6 +194,14 @@ export const api = {
       { auth: false },
     ),
   me: () => request<User>("/auth/me"),
+  boutique: () => request<Boutique>("/boutique"),
+  updateBoutique: (section: BoutiqueSection, data: Record<string, unknown>) =>
+    request<Boutique>(`/boutique/${section}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  completeOnboarding: () =>
+    request<Boutique>("/boutique/onboarding/complete", { method: "POST" }),
   dashboard: () => request<DashboardSummary>("/dashboard/summary"),
   usage: () => request<Usage>("/calls/usage"),
   listCalls: (filters: CallFilters) =>

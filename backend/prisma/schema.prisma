@@ -51,7 +51,39 @@ model User {
   email        String   @unique
   name         String
   passwordHash String
+  boutiqueId   Int
+  boutique     Boutique @relation(fields: [boutiqueId], references: [id])
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
 
+  @@index([boutiqueId])
   @@map("users")
+}
+
+/// The merchant's shop. Created empty at registration and filled by the onboarding.
+/// Allowed values for the list fields live in backend/src/boutique/boutique-options.ts.
+model Boutique {
+  id                    Int       @id @default(autoincrement())
+  // Screen 1 (required) — identity
+  name                  String?   @db.VarChar(100)
+  businessPhone         String?   @db.VarChar(30)
+  platform              String?   @db.VarChar(30)
+  // Screen 2 (required) — agent
+  callLanguages         String[]  @default([])
+  /// "HH:MM", Africa/Tunis.
+  callStartTime         String?   @db.VarChar(5)
+  callEndTime           String?   @db.VarChar(5)
+  confirmationProcess   String?   @db.VarChar(30)
+  // Screen 3 (optional) — business details
+  sector                String?   @db.VarChar(30)
+  /// Gouvernorat codes, or ["all"] for the whole country.
+  deliveryZones         String[]  @default([])
+  dailyOrderVolume      String?   @db.VarChar(20)
+  acquisitionSource     String?   @db.VarChar(30)
+  carrier               String?   @db.VarChar(30)
+  onboardingCompletedAt DateTime? @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  users                 User[]
+
+  @@map("boutiques")
 }

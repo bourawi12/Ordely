@@ -1,5 +1,7 @@
+import { redirect } from "next/navigation";
 import AppShell from "@/components/app/AppShell";
 import { api } from "@/lib/api";
+import { stepHref } from "@/lib/onboarding";
 
 export default async function AppLayout({
   children,
@@ -7,7 +9,16 @@ export default async function AppLayout({
   children: React.ReactNode;
 }>) {
   // api.me() redirects to /login if the session is missing or expired.
-  const [user, usage] = await Promise.all([api.me(), api.usage().catch(() => null)]);
+  const [user, boutique, usage] = await Promise.all([
+    api.me(),
+    api.boutique(),
+    api.usage().catch(() => null),
+  ]);
+
+  // The app stays closed until the boutique's onboarding is done.
+  if (!boutique.onboarding.completed) {
+    redirect(stepHref(boutique.onboarding.nextStep));
+  }
 
   return (
     <AppShell user={user} usage={usage}>
