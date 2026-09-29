@@ -1,4 +1,8 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -10,7 +14,7 @@ import { AuthService } from './auth.service';
 describe('AuthService', () => {
   let service: AuthService;
   let jwt: JwtService;
-  const user = { findUnique: jest.fn(), create: jest.fn() };
+  const user = { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -96,5 +100,71 @@ describe('AuthService', () => {
     await expect(
       service.login({ email: 'nobody@example.com', password: 'x' }),
     ).rejects.toThrow('Invalid email or password');
+  });
+
+  it('updates user profile name and does not return passwordHash', async () => {
+    user.findUnique.mockResolvedValue({
+      id: 1,
+      email: 'ada@example.com',
+      name: 'Ada',
+      passwordHash: 'hash',
+    });
+    user.update.mockResolvedValue({
+      id: 1,
+      email: 'ada@example.com',
+      name: 'Ada Lovelace',
+      passwordHash: 'hash',
+    });
+
+    const result = await service.updateProfile(1, { name: 'Ada Lovelace' });
+    expect(result).toEqual({
+      id: 1,
+      email: 'ada@example.com',
+      name: 'Ada Lovelace',
+    });
+    expect(user.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { name: 'Ada Lovelace' },
+    });
+  });
+
+  it('changes password when current password matches', async () => {
+    const oldHash = await bcrypt.hash('old-password', 4);
+    user.findUnique.mockResolvedValue({
+      id: 1,
+      email: 'ada@example.com',
+      name: 'Ada',
+      passwordHash: oldHash,
+    });
+    user.update.mockResolvedValue({ id: 1 });
+
+    const result = await service.changePassword(1, {
+      currentPassword: 'old-password',
+      newPassword: 'new-password-123',
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(user.update).toHaveBeenCalled();
+    const updatedData = user.update.mock.calls[0][0].data;
+    await expect(
+      bcrypt.compare('new-password-123', updatedData.passwordHash),
+    ).resolves.toBe(true);
+  });
+
+  it('rejects password change if current password is wrong', async () => {
+    const oldHash = await bcrypt.hash('old-password', 4);
+    user.findUnique.mockResolvedValue({
+      id: 1,
+      email: 'ada@example.com',
+      name: 'Ada',
+      passwordHash: oldHash,
+    });
+
+    await expect(
+      service.changePassword(1, {
+        currentPassword: 'wrong-password',
+        newPassword: 'new-password-123',
+      }),
+    ).rejects.toThrow(BadRequestException);
   });
 });
