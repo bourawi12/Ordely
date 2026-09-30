@@ -9,30 +9,39 @@ import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
   let jwt: JwtService;
 
-const user = {
-  findUnique: jest.fn(),
-  create: jest.fn(),
-  update: jest.fn(),
-};
+  const user = {
+    findUnique: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  };
 
-const boutique = { create: jest.fn() };
+  const boutique = { create: jest.fn() };
+  const storage = {
+    put: jest.fn(),
+    remove: jest.fn(),
+    url: jest.fn((key: string) =>
+      Promise.resolve(`https://files.test/${key}?sig`),
+    ),
+  };
 
-// Registration runs in an interactive transaction: hand the callback the same mocks.
-const $transaction = jest.fn((fn: (tx: unknown) => unknown) =>
-  fn({ user, boutique }),
-);
+  // Registration runs in an interactive transaction: hand the callback the same mocks.
+  const $transaction = jest.fn((fn: (tx: unknown) => unknown) =>
+    fn({ user, boutique }),
+  );
   beforeEach(async () => {
     jest.clearAllMocks();
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: PrismaService, useValue: { user, boutique, $transaction } },
+        { provide: StorageService, useValue: storage },
         {
           provide: JwtService,
           useValue: new JwtService({ secret: 'test-secret' }),
@@ -152,6 +161,7 @@ const $transaction = jest.fn((fn: (tx: unknown) => unknown) =>
       id: 1,
       email: 'ada@example.com',
       name: 'Ada Lovelace',
+      avatarUrl: null,
     });
     expect(user.update).toHaveBeenCalledWith({
       where: { id: 1 },
@@ -197,5 +207,56 @@ const $transaction = jest.fn((fn: (tx: unknown) => unknown) =>
         newPassword: 'new-password-123',
       }),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  describe('profile picture', () => {
+    const PNG = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0,
+    ]);
+    const existing = {
+      id: 1,
+      email: 'ada@example.com',
+      name: 'Ada',
+      passwordHash: 'x',
+      boutiqueId: 42,
+      avatarKey: 'avatars/1/old.jpg',
+      createdAt: new Date(),
+    };
+
+    it('stores a real image under the user, returns a signed URL and drops the old file', async () => {
+      user.findUnique.mockResolvedValue(existing);
+      user.update.mockImplementation(({ data }) =>
+        Promise.resolve({ ...existing, ...data }),
+      );
+
+      const result = await service.uploadAvatar(1, {
+        buffer: PNG,
+        size: PNG.length,
+      });
+
+      const [key, body, mime] = storage.put.mock.calls[0];
+      expect(key).toMatch(/^avatars\/1\/[0-9a-f-]{36}\.png$/);
+      expect(body).toBe(PNG);
+      expect(mime).toBe('image/png');
+      expect(storage.remove).toHaveBeenCalledWith('avatars/1/old.jpg');
+      expect(result.avatarUrl).toBe(`https://files.test/${key}?sig`);
+      expect(result).not.toHaveProperty('avatarKey');
+    });
+
+    it('refuses a file that is not an image, whatever its name, and stores nothing', async () => {
+      user.findUnique.mockResolvedValue(existing);
+      const text = Buffer.from('<?php echo "hi"; ?>');
+      await expect(
+        service.uploadAvatar(1, { buffer: text, size: text.length }),
+      ).rejects.toThrow('Format non pris en charge');
+      expect(storage.put).not.toHaveBeenCalled();
+    });
+
+    it('refuses images over 2 MB', async () => {
+      await expect(
+        service.uploadAvatar(1, { buffer: PNG, size: 2 * 1024 * 1024 + 1 }),
+      ).rejects.toThrow('2 Mo');
+      expect(storage.put).not.toHaveBeenCalled();
+    });
   });
 });

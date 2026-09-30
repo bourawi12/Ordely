@@ -65,3 +65,46 @@ export async function changePassword(
     return { error: errorMessage(err, "Impossible de modifier le mot de passe.") };
   }
 }
+
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/** Sends the chosen picture to the API, which checks the real file type and stores it in MinIO. */
+export async function uploadAvatar(
+  _prev: SettingsActionState,
+  formData: FormData,
+): Promise<SettingsActionState> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choisissez une image à envoyer." };
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    return { error: "L'image dépasse 2 Mo." };
+  }
+  if (!AVATAR_TYPES.includes(file.type)) {
+    return { error: "Format non pris en charge. Utilisez une image JPEG, PNG ou WebP." };
+  }
+
+  const body = new FormData();
+  body.append("file", file, file.name);
+  try {
+    await api.uploadAvatar(body);
+  } catch (err) {
+    unstable_rethrow(err);
+    return { error: errorMessage(err, "Impossible d'enregistrer la photo.") };
+  }
+  // The header avatar lives in the app layout.
+  revalidatePath("/", "layout");
+  return { success: "Votre photo de profil a été mise à jour." };
+}
+
+export async function removeAvatar(): Promise<SettingsActionState> {
+  try {
+    await api.removeAvatar();
+  } catch (err) {
+    unstable_rethrow(err);
+    return { error: errorMessage(err, "Impossible de supprimer la photo.") };
+  }
+  revalidatePath("/", "layout");
+  return { success: "Votre photo de profil a été supprimée." };
+}

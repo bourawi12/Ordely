@@ -1,13 +1,13 @@
 ﻿"use client";
 
 import { useState } from "react";
-import Icon from "@/components/Icon";
+import Icon, { type IconName } from "@/components/Icon";
 import styles from "./settings.module.css";
 
 interface Tab {
   id: "profile" | "security" | "session";
   label: string;
-  icon: string;
+  icon: IconName;
 }
 
 const TABS: Tab[] = [
@@ -36,10 +36,23 @@ export function SettingsTabs({
   };
 
   return (
-    <div>
-      <h1 style={{ color: "blue", fontSize: "40px" }}>
-        TEST SETTINGS TABS
-      </h1>
+    <div className={styles.tabsWrapper}>
+      <nav className={styles.tabNav} role="tablist" aria-label="Parametres">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={active === tab.id}
+            aria-controls={`panel-${tab.id}`}
+            id={`tab-${tab.id}`}
+            onClick={() => setActive(tab.id)}
+            className={`${styles.tabBtn} ${active === tab.id ? styles.tabBtnActive : ""}`}
+          >
+            <Icon name={tab.icon} size={16} />
+            {tab.label}
+          </button>
+        ))}
+      </nav>
 
       <div className={styles.tabsWrapper}>
 

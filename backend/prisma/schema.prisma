@@ -53,6 +53,8 @@ model User {
   passwordHash String
   boutiqueId   Int
   boutique     Boutique @relation(fields: [boutiqueId], references: [id])
+  /// Object key of the profile picture in the S3 bucket (never a URL: URLs are signed on read).
+  avatarKey    String?  @db.VarChar(255)
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([boutiqueId])
