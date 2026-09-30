@@ -11,10 +11,10 @@ export default async function AppearanceSettingsPage() {
 
   return (
     <>
-      <header className={styles.pageHead}>
+     {/*  <header className={styles.pageHead}>
         <h2>Appearance</h2>
         <p>Make Ordely yours: pick a theme and the colour of the app.</p>
-      </header>
+      </header> */}
       <AppearanceForm accentColor={user.accentColor} themeMode={user.themeMode} />
     </>
   );

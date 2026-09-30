@@ -1,0 +1,70 @@
+/* "Check your inbox" and link result screens, inside the auth card (auth.module.css palette). */
+.status {
+  align-items: center;
+  text-align: center;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: var(--sky);
+  color: var(--blue);
+}
+
+.ok {
+  background: #e7f6ec;
+  color: #1f7a3f;
+}
+
+.bad {
+  background: #fdecec;
+  color: #b42318;
+}
+
+.text {
+  margin: -0.25rem 0 0.25rem;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.text strong {
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+.resend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+/* A link styled as the card's main button. */
+.cta {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.hint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.switch {
+  margin: 0.25rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.linkButton {
+  padding: 0;
+  background: none;
+  color: var(--blue);
+  font: inherit;
+  font-weight: 600;
+}

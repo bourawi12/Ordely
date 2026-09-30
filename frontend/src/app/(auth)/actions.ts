@@ -2,6 +2,7 @@
 
 import { redirect, unstable_rethrow } from "next/navigation";
 import { api, ApiError, type AuthResult } from "@/lib/api";
+import { isStrongPassword } from "@/lib/password";
 import { clearSession, safeNextPath, setSession } from "@/lib/session";
 import { HEX_COLOR, THEME_MODES, type ThemeMode } from "@/lib/theme";
 
@@ -55,6 +56,14 @@ export async function register(
   const name = String(formData.get("name") ?? "");
   const password = String(formData.get("password") ?? "");
 
+  if (!isStrongPassword(password)) {
+    return {
+      error:
+        "Le mot de passe doit contenir au moins 8 caractères, dont une majuscule, une minuscule, un chiffre et un caractère spécial.",
+      email,
+      name,
+    };
+  }
   if (password !== String(formData.get("confirm") ?? "")) {
     return { error: "Passwords do not match.", email, name };
   }
@@ -78,8 +87,8 @@ export async function register(
       upload.set("file", avatar);
       await api.uploadAvatar(upload, result.accessToken).catch(() => undefined);
     }
-    // A new account always continues with the short boutique onboarding.
-    await startSession(result, null, "/onboarding");
+    // A new account first confirms its email address, then goes through the onboarding.
+    await startSession(result, null, "/verify-email");
   } catch (err) {
     unstable_rethrow(err);
     return { error: errorMessage(err), email, name };

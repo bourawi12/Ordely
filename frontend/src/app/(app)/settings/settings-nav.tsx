@@ -30,10 +30,10 @@ export default function SettingsNav() {
             className={styles.navLink}
             aria-current={active ? "page" : undefined}
           >
-            <Icon name={s.icon} size={20} className={styles.navIcon} />
+            {/* <Icon name={s.icon} size={20} className={styles.navIcon} /> */}
             <span className={styles.navText}>
               <span className={styles.navLabel}>{s.label}</span>
-              <span className={styles.navDesc}>{s.description}</span>
+              {/* <span className={styles.navDesc}>{s.description}</span> */}
             </span>
           </Link>
         );

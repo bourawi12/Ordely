@@ -82,23 +82,25 @@ This repository contains the Ordely web app: a NestJS API, a Next.js dashboard a
 | `frontend` | Next.js 15             | http://localhost:3200       |
 | `backend`  | NestJS 10 + Prisma 6   | http://localhost:3001/api   |
 | `db`       | PostgreSQL 16          | `localhost:5433`            |
+| `mailpit`  | Mailpit (dev inbox)    | http://localhost:8025       |
 
 ### Run everything with Docker
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-This builds the **production** images: code changes only show up after another `--build`.
-For development with live reload inside Docker, add the dev file:
+This is **development mode** (from `docker-compose.override.yml`, which Docker Compose merges
+automatically): your `backend/` and `frontend/` folders are mounted into the containers, which run
+`nest start --watch` and `next dev`, so a saved file is live in a few seconds. Add `--build` (plus
+`-V` to refresh `node_modules`) only after changing a `package.json`.
+
+For the **production** images, where the code is copied in at build time and changes only show up
+after a rebuild, name the base file explicitly:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.yml up -d --build
 ```
-
-Your `backend/` and `frontend/` folders are mounted into the containers, which run
-`nest start --watch` and `next dev`: a saved file is live in a few seconds. Rebuild (`--build`,
-plus `-V` to refresh `node_modules`) only after changing a `package.json`.
 
 A root `.env` with `JWT_SECRET` is required (see [.env.example](.env.example));
 host ports, database name and credentials can be overridden there too. Data is kept in the `db-data` volume;
@@ -148,11 +150,16 @@ npm run db:seed -- --reset   # replaces ALL orders and calls
   HttpOnly `ordely_session` cookie and sends it as a Bearer token on server-side API calls.
 - Every API route requires `Authorization: Bearer <token>` except `/api/health` and `/api/auth/*`.
 - Login and register are rate-limited per email (10 and 5 attempts per minute).
+- A new account is closed until its email address is confirmed: sign-up sends a link (valid 24 h,
+  single use) and every API route except `/auth/me`, `/auth/resend-verification` and
+  `/auth/avatar` answers `403 Email address not verified` until then. In development the emails land
+  in Mailpit (http://localhost:8025); set `SMTP_*` and `APP_URL` to send real ones.
 
 ### API
 
 - `GET /api/health` — reports app and database status (public)
 - `POST /api/auth/register` `{ email, name, password, accentColor?, themeMode? }` (`accentColor` is `#rrggbb`, `themeMode` is `system`, `light` or `dark`) · `POST /api/auth/login` `{ email, password }` (public)
+- `POST /api/auth/verify-email` `{ token }` (public) · `POST /api/auth/resend-verification` (one per minute)
 - `GET /api/auth/me` · `PATCH /api/auth/appearance` `{ accentColor?, themeMode? }` (`accentColor: null` goes back to the Ordely blue)
 - `GET /api/dashboard/summary` — 30-day stats, 7-day confirmations, recent calls, pending orders
 - `GET /api/calls?status=&search=&range=today|7d|30d|all&page=` · `GET /api/calls/export` (CSV) · `GET /api/calls/:id`

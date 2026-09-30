@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
+import { MailMessage, MailService } from './../src/mail/mail.service';
 import { PrismaService } from './../src/prisma/prisma.service';
 
 // Runs against the database in DATABASE_URL (e.g. `docker compose up -d db`).
@@ -10,11 +11,22 @@ describe('App (e2e)', () => {
   let prisma: PrismaService;
   let token: string;
   const email = `e2e-${Date.now()}@example.com`;
+  // Meets the password rule (upper, lower, digit, special character).
+  const PASSWORD = 'Passw0rd!e2e';
+  // Emails are kept here instead of going out over SMTP.
+  const sentMail: MailMessage[] = [];
+  const lastLinkToken = (to: string) => {
+    const mail = sentMail.filter((m) => m.to === to).pop();
+    return /verify-email\?token=([\w-]+)/.exec(mail?.text ?? '')?.[1] ?? '';
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(MailService)
+      .useValue({ send: async (m: MailMessage) => void sentMail.push(m) })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
@@ -66,7 +78,7 @@ describe('App (e2e)', () => {
         .send({
           email: email.toUpperCase(),
           name: 'E2E User',
-          password: 'password123',
+          password: PASSWORD,
         })
         .expect(201);
       expect(registered.body.user).toMatchObject({ email, name: 'E2E User' });
@@ -74,7 +86,7 @@ describe('App (e2e)', () => {
 
       await request(server)
         .post('/auth/register')
-        .send({ email, name: 'Again', password: 'password123' })
+        .send({ email, name: 'Again', password: PASSWORD })
         .expect(409);
 
       await request(server)
@@ -84,7 +96,7 @@ describe('App (e2e)', () => {
 
       const login = await request(server)
         .post('/auth/login')
-        .send({ email, password: 'password123' })
+        .send({ email, password: PASSWORD })
         .expect(200);
       token = login.body.accessToken;
 
@@ -95,6 +107,48 @@ describe('App (e2e)', () => {
         .expect((res) => expect(res.body.email).toBe(email));
     });
 
+    it('keeps a new account closed until the emailed link is used', async () => {
+      const server = app.getHttpServer();
+      const auth = { Authorization: `Bearer ${token}` };
+
+      // Signed in, but only the verification routes answer.
+      await request(server)
+        .get('/auth/me')
+        .set(auth)
+        .expect(200)
+        .expect((res) => expect(res.body.emailVerifiedAt).toBeNull());
+      await request(server)
+        .get('/boutique')
+        .set(auth)
+        .expect(403)
+        .expect((res) =>
+          expect(res.body.message).toBe('Email address not verified'),
+        );
+      // The sign-up email was sent seconds ago.
+      await request(server)
+        .post('/auth/resend-verification')
+        .set(auth)
+        .expect(429);
+
+      const linkToken = lastLinkToken(email);
+      await request(server)
+        .post('/auth/verify-email')
+        .send({ token: 'not-a-real-token' })
+        .expect(400);
+      await request(server)
+        .post('/auth/verify-email')
+        .send({ token: linkToken })
+        .expect(200)
+        .expect((res) => expect(res.body).toEqual({ email }));
+
+      await request(server).get('/boutique').set(auth).expect(200);
+      // One use only.
+      await request(server)
+        .post('/auth/verify-email')
+        .send({ token: linkToken })
+        .expect(400);
+    });
+
     it('stores the look chosen at sign-up and refuses a bad colour', async () => {
       const server = app.getHttpServer();
       const themed = `themed-${email}`;
@@ -103,7 +157,7 @@ describe('App (e2e)', () => {
         .send({
           email: themed,
           name: 'Themed',
-          password: 'password123',
+          password: PASSWORD,
           accentColor: 'purple',
         })
         .expect(400);
@@ -112,7 +166,7 @@ describe('App (e2e)', () => {
         .send({
           email: themed,
           name: 'Themed',
-          password: 'password123',
+          password: PASSWORD,
           accentColor: '#7C3AED',
           themeMode: 'dark',
         })
@@ -129,11 +183,48 @@ describe('App (e2e)', () => {
       await prisma.boutique.delete({ where: { id: created.boutiqueId } });
     });
 
-    it('rejects weak registrations', () => {
-      return request(app.getHttpServer())
+    it('rejects weak registrations', async () => {
+      const server = app.getHttpServer();
+      await request(server)
         .post('/auth/register')
         .send({ email: 'not-an-email', name: '', password: 'short' })
         .expect(400);
+      // Long enough, but no uppercase letter and no special character.
+      const weak = await request(server)
+        .post('/auth/register')
+        .send({ email: `weak-${email}`, name: 'Weak', password: 'password123' })
+        .expect(400);
+      expect(weak.body.message).toContain(
+        'password must contain an uppercase letter, a lowercase letter, a number and a special character',
+      );
+    });
+
+    it('changes the password only to a strong one, then logs in with it', async () => {
+      const server = app.getHttpServer();
+      const auth = { Authorization: `Bearer ${token}` };
+      await request(server)
+        .patch('/auth/change-password')
+        .set(auth)
+        .send({ currentPassword: PASSWORD, newPassword: 'alllowercase1!' })
+        .expect(400);
+
+      const strong = 'N3w-Passw0rd!';
+      await request(server)
+        .patch('/auth/change-password')
+        .set(auth)
+        .send({ currentPassword: PASSWORD, newPassword: strong })
+        .expect(200);
+      await request(server)
+        .post('/auth/login')
+        .send({ email, password: strong })
+        .expect(200);
+
+      // Back to the shared password for the tests that follow.
+      await request(server)
+        .patch('/auth/change-password')
+        .set(auth)
+        .send({ currentPassword: strong, newPassword: PASSWORD })
+        .expect(200);
     });
   });
 

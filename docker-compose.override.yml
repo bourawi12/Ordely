@@ -1,0 +1,56 @@
+# Development mode: live reload inside Docker. Docker Compose merges this file automatically,
+# so the everyday command is simply:
+#
+#   docker compose up -d            (add --build after changing a package.json, -V to refresh node_modules)
+#
+# The source folders are mounted from your disk, the backend runs `nest start --watch` and the
+# frontend `next dev`: a saved file shows up in a few seconds, no rebuild needed.
+#
+# Production images (code copied in at build time, no live reload) ignore this file:
+#
+#   docker compose -f docker-compose.yml up -d --build
+
+services:
+  backend:
+    # Its own image name: the dev stage must never replace the production image (and the reverse).
+    image: ordely-backend-dev
+    build:
+      context: ./backend
+      # The image stage with node_modules installed for Linux (and the Prisma client).
+      target: deps
+    # Regenerate the Prisma client in case the schema changed, apply migrations, then watch.
+    # nest-cli.docker.json only turns off deleteOutDir: dist/ is a volume and cannot be removed.
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && npx nest start --watch -c nest-cli.docker.json"
+    environment:
+      NODE_ENV: development
+      # Same reason as WATCHPACK_POLLING below: TypeScript's watcher polls the files instead of
+      # relying on change events, which a save that swaps in a new file never sends.
+      TSC_WATCHFILE: DynamicPriorityPolling
+    volumes:
+      - ./backend:/app
+      # Keep the container's own node_modules and build output: the host ones are
+      # built for another platform and belong to local `npm run start:dev`.
+      - /app/node_modules
+      - /app/dist
+    healthcheck:
+      # The first TypeScript compile takes a while in watch mode.
+      start_period: 90s
+
+  frontend:
+    # Its own image name: the dev stage must never replace the production image (and the reverse).
+    image: ordely-frontend-dev
+    build:
+      context: ./frontend
+      target: deps
+    command: npx next dev -p 3000 -H 0.0.0.0
+    environment:
+      # Check the files every second instead of waiting for change events: a save that swaps in a
+      # new file (how many editors and tools save) never reaches the container through the mount.
+      WATCHPACK_POLLING: "1000"
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      # A separate .next so the container never collides with a local `npm run dev`.
+      - /app/.next

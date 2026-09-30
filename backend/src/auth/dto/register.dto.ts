@@ -9,6 +9,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { PASSWORD_RULE, PASSWORD_RULE_MESSAGE } from '../password';
 import { HEX_COLOR, THEME_MODES, ThemeMode } from '../theme';
 
 export class RegisterDto {
@@ -28,6 +29,7 @@ export class RegisterDto {
   @IsString()
   @MinLength(8)
   @MaxLength(72)
+  @Matches(PASSWORD_RULE, { message: PASSWORD_RULE_MESSAGE })
   password: string;
 
   // Look chosen on the first sign-up screen; both optional.

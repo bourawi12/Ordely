@@ -12,11 +12,11 @@ export default async function ProfileSettingsPage() {
 
   return (
     <>
-      <header className={styles.pageHead}>
+     {/*  <header className={styles.pageHead}>
         <h2>Profile</h2>
         <p>How you appear in Ordely.</p>
-      </header>
-      <AvatarForm name={user.name} avatarUrl={user.avatarUrl} />
+      </header> */}
+    <AvatarForm name={user.name} avatarUrl={user.avatarUrl} />
       <ProfileForm name={user.name} email={user.email} />
     </>
   );

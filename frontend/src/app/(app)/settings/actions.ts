@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
+import { isStrongPassword } from "@/lib/password";
 import { HEX_COLOR, THEME_MODES, type ThemeMode } from "@/lib/theme";
 
 export interface SettingsActionState {
@@ -75,8 +76,11 @@ export async function changePassword(
   if (!currentPassword) {
     return { error: "Enter your current password." };
   }
-  if (newPassword.length < 8) {
-    return { error: "Your new password needs at least 8 characters." };
+  if (!isStrongPassword(newPassword)) {
+    return {
+      error:
+        "Your new password needs at least 8 characters, with an uppercase letter, a lowercase letter, a number and a special character.",
+    };
   }
   if (newPassword !== confirmPassword) {
     return { error: "The two new passwords don't match." };

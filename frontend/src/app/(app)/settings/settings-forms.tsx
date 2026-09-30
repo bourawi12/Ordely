@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Icon from "@/components/Icon";
+import PasswordRules from "@/components/PasswordRules";
 import ui from "@/components/app/ui.module.css";
 import { changePassword, updateProfile, type SettingsActionState } from "./actions";
 import { CardFooter, CardHead, useSaveStatus } from "./settings-ui";
@@ -59,6 +60,9 @@ export function PasswordForm() {
     {},
   );
   const [status, dismiss] = useSaveStatus(state);
+  // Drives the checklist. React empties the password fields after each submit.
+  const [newPassword, setNewPassword] = useState("");
+  useEffect(() => setNewPassword(""), [state]);
 
   return (
     <form action={action} onChange={dismiss} className={`${ui.card} ${styles.card}`}>
@@ -86,6 +90,8 @@ export function PasswordForm() {
               required
               minLength={8}
               maxLength={72}
+              onChange={(e) => setNewPassword(e.target.value)}
+              aria-describedby="new-password-rules"
               className={ui.input}
             />
           </label>
@@ -101,9 +107,12 @@ export function PasswordForm() {
               className={ui.input}
             />
           </label>
+          <div className={styles.fullRow}>
+            <PasswordRules id="new-password-rules" value={newPassword} />
+          </div>
         </div>
       </div>
-      <CardFooter status={status} hint="At least 8 characters.">
+      <CardFooter status={status} hint="Your new password must tick every rule above.">
         <button type="submit" className={ui.btn} disabled={pending}>
           {pending ? "Updating…" : "Update password"}
         </button>

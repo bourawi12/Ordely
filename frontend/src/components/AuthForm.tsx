@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, type ReactNode } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
+import PasswordRules from "@/components/PasswordRules";
 import { login, register, type AuthFormState } from "@/app/(auth)/actions";
 import styles from "@/app/(auth)/auth.module.css";
 
@@ -22,6 +23,9 @@ export default function AuthForm({ mode, next, notice, header, prepare }: AuthFo
     {},
   );
   const suffix = next ? `?next=${encodeURIComponent(next)}` : "";
+  // Sign-up only: drives the password checklist. React empties the field after each submit.
+  const [password, setPassword] = useState("");
+  useEffect(() => setPassword(""), [state]);
 
   return (
     <form
@@ -73,8 +77,15 @@ export default function AuthForm({ mode, next, notice, header, prepare }: AuthFo
           required
           minLength={isLogin ? undefined : 8}
           maxLength={72}
+          onChange={isLogin ? undefined : (e) => setPassword(e.target.value)}
+          aria-describedby={isLogin ? undefined : "password-rules"}
         />
       </label>
+      {!isLogin && (
+        <div className={styles.passwordRules}>
+          <PasswordRules id="password-rules" value={password} locale="fr" />
+        </div>
+      )}
       {!isLogin && (
         <label>
           Confirmer le mot de passe

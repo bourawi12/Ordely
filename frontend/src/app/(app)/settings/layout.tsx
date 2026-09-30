@@ -4,7 +4,7 @@ import { initials } from "@/lib/format";
 import SettingsNav from "./settings-nav";
 import styles from "./settings.module.css";
 
-/** Settings: who is signed in and the section menu on the left, the section on the right. */
+/** Settings: a bar with who is signed in and the section tabs, the open section below. */
 export default async function SettingsLayout({
   children,
 }: Readonly<{
@@ -14,8 +14,8 @@ export default async function SettingsLayout({
 
   return (
     <div className={styles.layout}>
-      <aside className={`${ui.card} ${styles.aside}`}>
-        <div className={styles.me}>
+      <header className={`${ui.card} ${styles.bar}`}>
+        {/* <div className={styles.me}>
           <span className={styles.meAvatar} aria-hidden="true">
             {user.avatarUrl ? (
               // Signed MinIO URL, different on each render: next/image would add nothing.
@@ -29,9 +29,9 @@ export default async function SettingsLayout({
             <strong>{user.name}</strong>
             <span>{user.email}</span>
           </span>
-        </div>
+        </div> */}
         <SettingsNav />
-      </aside>
+      </header>
       <div className={styles.section}>{children}</div>
     </div>
   );

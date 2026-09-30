@@ -100,6 +100,11 @@
   box-shadow: 0 0 0 4px rgba(30, 99, 255, 0.15);
 }
 
+/* Sits right under the password field it describes. */
+.passwordRules {
+  margin-top: -0.35rem;
+}
+
 .submit {
   margin-top: 0.5rem;
   padding: 0.8rem 1rem;

@@ -55,25 +55,29 @@
   display: flex;
   white-space: nowrap;
   align-items: center;
-  gap: 0.9rem;
+  gap: 2rem;
   padding: 0.7rem 1rem;
   border-radius: 10px;
   color: var(--muted);
   font-size: 1.02rem;
-  transition:
+  /* transition:
     background 0.15s ease,
-    color 0.15s ease;
+    color 0.15s ease; */
 }
 
 .navLink:hover {
   background: var(--app-bg);
   color: var(--text);
+  border-radius: 10px;
+
 }
 
 .navLink.active {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 500;
+  border-radius: 10px;
+
 }
 
 .plan {

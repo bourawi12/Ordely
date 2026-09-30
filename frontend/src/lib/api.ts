@@ -94,6 +94,8 @@ export interface User {
   /** "#rrggbb", or null for the Ordely blue. */
   accentColor: string | null;
   themeMode: ThemeMode;
+  /** Null until the address is confirmed through the emailed link; the app stays closed until then. */
+  emailVerifiedAt: string | null;
   createdAt: string;
 }
 
@@ -133,6 +135,9 @@ export class ApiError extends Error {
 }
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:3001/api";
+/** The API's 403 message for a signed-in account whose email is not confirmed yet
+ * (backend/src/auth/allow-unverified.decorator.ts). */
+const EMAIL_NOT_VERIFIED = "Email address not verified";
 
 async function send(
   path: string,
@@ -155,6 +160,14 @@ async function send(
   // Missing or expired session on a protected call: send the user to log in.
   if (res.status === 401 && auth) {
     redirect("/login?expired=1");
+  }
+
+  // Signed in but not confirmed yet: every page and action lands on the "check your inbox" screen.
+  if (res.status === 403 && auth) {
+    const body = await res.clone().json().catch(() => null);
+    if (body?.message === EMAIL_NOT_VERIFIED) {
+      redirect("/verify-email");
+    }
   }
 
   if (!res.ok) {
@@ -209,6 +222,15 @@ export const api = {
       { auth: false },
     ),
   me: () => request<User>("/auth/me"),
+  /** Public: the emailed link may be opened without a session. */
+  verifyEmail: (token: string) =>
+    request<{ email: string }>(
+      "/auth/verify-email",
+      { method: "POST", body: JSON.stringify({ token }) },
+      { auth: false },
+    ),
+  resendVerification: () =>
+    request<{ sent: true }>("/auth/resend-verification", { method: "POST" }),
 
   /** multipart body with the image in the "file" field. */
   uploadAvatar: (form: FormData, token?: string) =>

@@ -15,10 +15,10 @@ export default async function SecuritySettingsPage() {
 
   return (
     <>
-      <header className={styles.pageHead}>
+      {/* <header className={styles.pageHead}>
         <h2>Security</h2>
         <p>Your password and this browser&apos;s session.</p>
-      </header>
+      </header> */}
       <PasswordForm />
 
       <section className={`${ui.card} ${styles.card}`}>

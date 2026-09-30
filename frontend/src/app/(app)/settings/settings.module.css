@@ -1,27 +1,30 @@
-/* Settings: who is signed in and the section menu on the left, the open section on the right.
+/* Settings: a bar on top (who is signed in, then the section tabs), the open section below.
    Tokens only (globals.css), so every theme and accent colour applies. */
 .layout {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 2rem;
-  align-items: start;
-  max-width: 1100px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 880px;
+  /* A column centred in the page, whatever the screen width. */
+  margin: 0 auto;
 }
 
-/* ---------- Menu ---------- */
-.aside {
-  position: sticky;
-  top: 1.5rem;
-  padding: 0.75rem;
+/* ---------- Menu bar ---------- */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.6rem;
 }
 
 .me {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 0.5rem;
-  padding: 0.5rem 0.5rem 1rem;
-  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
 }
 
 .meAvatar {
@@ -68,29 +71,39 @@
 
 .nav {
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  flex: none;
+  gap: 1.5rem;
 }
 
 .navLink {
   display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.7rem 0.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 0.6rem 1rem;
+  /* Transparent until pressed or selected, so the tab never shifts when it shows. */
+  border: 1px solid transparent;
   border-radius: 10px;
   color: var(--text);
   transition:
-    background 0.15s ease,
+    /* background 0.15s ease, */
+    border-color 0.15s ease,
     color 0.15s ease;
 }
 
 .navLink:hover {
-  background: var(--app-bg);
+  /* background: var(--app-bg); */
 }
 
 .navLink[aria-current="page"] {
-  background: var(--accent-soft);
+  /* background: var(--accent-soft); */
   color: var(--accent);
+}
+
+/* Pressed or selected: a border in the colour of the tab's own label. */
+.navLink:active,
+.navLink[aria-current="page"] {
+  border-color: currentColor;
 }
 
 .navIcon {
@@ -121,7 +134,6 @@
   flex-direction: column;
   gap: 1.25rem;
   min-width: 0;
-  max-width: 760px;
 }
 
 .pageHead h2 {
@@ -207,6 +219,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem 1.25rem;
+}
+
+.fullRow {
+  grid-column: 1 / -1;
 }
 
 /* Starts a new row, leaving the rest of the previous one empty. */
@@ -410,46 +426,37 @@
 }
 
 /* ---------- Smaller screens ---------- */
-@media (max-width: 1100px) {
-  .layout {
-    grid-template-columns: 220px minmax(0, 1fr);
-    gap: 1.5rem;
-  }
-}
-
-/* The menu becomes a row of tabs above the section. */
+/* Tabs keep only their label and icon. */
 @media (max-width: 860px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .aside {
-    position: static;
-    padding: 0.4rem;
-  }
-
-  .me,
   .navDesc {
     display: none;
   }
 
+  .navLink {
+    align-items: center;
+  }
+}
+
+/* The tabs take the whole bar. */
+@media (max-width: 600px) {
+  .bar {
+    padding: 0.4rem;
+  }
+
+  .me {
+    display: none;
+  }
+
   .nav {
-    flex-direction: row;
+    flex: 1;
+    gap: 0.35rem;
   }
 
   .navLink {
     flex: 1 1 0;
-    align-items: center;
     justify-content: center;
     min-width: 0;
     padding: 0.55rem 0.75rem;
-  }
-}
-
-@media (max-width: 600px) {
-  /* Three tabs side by side on a phone: labels only. */
-  .navIcon {
-    display: none;
   }
 
   .navLabel {
@@ -480,6 +487,12 @@
 
   .facts dd {
     margin-bottom: 0.6rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .navIcon {
+    display: none;
   }
 }
 
