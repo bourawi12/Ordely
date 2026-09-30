@@ -1,6 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { getSessionToken } from "./session";
+import type { ThemeMode } from "./theme";
 
 export type OrderStatus = "pending" | "confirmed" | "cancelled";
 export type CallStatus = "pending" | "confirmed" | "failed" | "no_answer";
@@ -90,6 +91,11 @@ export interface User {
   name: string;
   /** Signed, short-lived URL of the profile picture (stored in MinIO), or null. */
   avatarUrl: string | null;
+  /** "#rrggbb", or null for the Ordely blue. */
+  accentColor: string | null;
+  themeMode: ThemeMode;
+  /** Null until the address is confirmed through the emailed link; the app stays closed until then. */
+  emailVerifiedAt: string | null;
   createdAt: string;
 }
 
@@ -129,13 +135,17 @@ export class ApiError extends Error {
 }
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:3001/api";
+/** The API's 403 message for a signed-in account whose email is not confirmed yet
+ * (backend/src/auth/allow-unverified.decorator.ts). */
+const EMAIL_NOT_VERIFIED = "Email address not verified";
 
 async function send(
   path: string,
   init: RequestInit | undefined,
   auth: boolean,
+  explicitToken?: string,
 ): Promise<Response> {
-  const token = auth ? await getSessionToken() : undefined;
+  const token = explicitToken ?? (auth ? await getSessionToken() : undefined);
   const res = await fetch(`${BACKEND_URL}${path}`, {
     ...init,
     headers: {
@@ -150,6 +160,14 @@ async function send(
   // Missing or expired session on a protected call: send the user to log in.
   if (res.status === 401 && auth) {
     redirect("/login?expired=1");
+  }
+
+  // Signed in but not confirmed yet: every page and action lands on the "check your inbox" screen.
+  if (res.status === 403 && auth) {
+    const body = await res.clone().json().catch(() => null);
+    if (body?.message === EMAIL_NOT_VERIFIED) {
+      redirect("/verify-email");
+    }
   }
 
   if (!res.ok) {
@@ -167,9 +185,10 @@ async function send(
 async function request<T>(
   path: string,
   init?: RequestInit,
-  { auth = true }: { auth?: boolean } = {},
+  // `token` stands in for the session cookie, e.g. right after sign-up in the same request.
+  { auth = true, token }: { auth?: boolean; token?: string } = {},
 ): Promise<T> {
-  const res = await send(path, init, auth);
+  const res = await send(path, init, auth, token);
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
@@ -190,18 +209,39 @@ export const api = {
       { method: "POST", body: JSON.stringify(data) },
       { auth: false },
     ),
-  register: (data: { email: string; name: string; password: string }) =>
+  register: (data: {
+    email: string;
+    name: string;
+    password: string;
+    accentColor?: string;
+    themeMode?: ThemeMode;
+  }) =>
     request<AuthResult>(
       "/auth/register",
       { method: "POST", body: JSON.stringify(data) },
       { auth: false },
     ),
   me: () => request<User>("/auth/me"),
+  /** Public: the emailed link may be opened without a session. */
+  verifyEmail: (token: string) =>
+    request<{ email: string }>(
+      "/auth/verify-email",
+      { method: "POST", body: JSON.stringify({ token }) },
+      { auth: false },
+    ),
+  resendVerification: () =>
+    request<{ sent: true }>("/auth/resend-verification", { method: "POST" }),
 
   /** multipart body with the image in the "file" field. */
-  uploadAvatar: (form: FormData) =>
-    request<User>("/auth/avatar", { method: "POST", body: form }),
+  uploadAvatar: (form: FormData, token?: string) =>
+    request<User>("/auth/avatar", { method: "POST", body: form }, { token }),
   removeAvatar: () => request<User>("/auth/avatar", { method: "DELETE" }),
+  /** accentColor null goes back to the Ordely blue. */
+  updateAppearance: (data: { accentColor: string | null; themeMode: ThemeMode }) =>
+    request<User>("/auth/appearance", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 updateProfile: (data: { name: string }) =>
   request<User>("/auth/profile", {
     method: "PATCH",

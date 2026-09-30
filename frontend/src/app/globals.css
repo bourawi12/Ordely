@@ -1,51 +1,45 @@
 :root {
-  --bg: #f5f7fb;
-  --surface: #ffffff;
-  --text: #0b1f44;
-  --muted: #6b6b76;
-  --border: #e3e9f4;
-  --accent: #1e63ff;
-  --accent-text: #ffffff;
-  --danger: #dc2626;
-  --success-bg: #dcfce7;
-  --success-text: #166534;
-  --pending-bg: #fef3c7;
-  --pending-text: #92400e;
-  --fail-bg: #fdecec;
-  --fail-text: #c62828;
-  --neutral-bg: #eef0f3;
-  --neutral-text: #5b6472;
-  --accent-soft: #edf2ff;
-  --track: #eef3fd;
-  --positive: #16a34a;
-  --negative: #dc2626;
-  --app-bg: #f8f9fb;
+  /* Each token holds its light and dark value; `color-scheme` picks one. The root follows the
+     device, and the signed-in app pins it to the user's choice (.theme-light / .theme-dark). */
+  color-scheme: light dark;
+  --bg: light-dark(#f5f7fb, #0a1428);
+  --surface: light-dark(#ffffff, #0f1f3d);
+  --text: light-dark(#0b1f44, #ededf0);
+  --muted: light-dark(#6b6b76, #9a9aa5);
+  --border: light-dark(#e3e9f4, #1d3260);
+  /* The Ordely blue. A user's own colour replaces --accent* (lib/theme.ts), never these. */
+  --brand-accent: light-dark(#1e63ff, #5b8cff);
+  --brand-accent-text: light-dark(#ffffff, #0a1428);
+  --brand-accent-soft: light-dark(#edf2ff, #15295a);
+  --accent: var(--brand-accent);
+  --accent-text: var(--brand-accent-text);
+  --danger: light-dark(#dc2626, #f87171);
+  --success-bg: light-dark(#dcfce7, #14532d);
+  --success-text: light-dark(#166534, #bbf7d0);
+  --pending-bg: light-dark(#fef3c7, #78350f);
+  --pending-text: light-dark(#92400e, #fde68a);
+  --fail-bg: light-dark(#fdecec, #4c1414);
+  --fail-text: light-dark(#c62828, #fca5a5);
+  --neutral-bg: light-dark(#eef0f3, #1f2b44);
+  --neutral-text: light-dark(#5b6472, #a9b4c8);
+  --accent-soft: var(--brand-accent-soft);
+  --track: light-dark(#eef3fd, #14254a);
+  --positive: light-dark(#16a34a, #4ade80);
+  --negative: light-dark(#dc2626, #f87171);
+  --app-bg: light-dark(#f8f9fb, #0a1428);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0a1428;
-    --surface: #0f1f3d;
-    --text: #ededf0;
-    --muted: #9a9aa5;
-    --border: #1d3260;
-    --accent: #5b8cff;
-    --accent-text: #0a1428;
-    --danger: #f87171;
-    --success-bg: #14532d;
-    --success-text: #bbf7d0;
-    --pending-bg: #78350f;
-    --pending-text: #fde68a;
-    --fail-bg: #4c1414;
-    --fail-text: #fca5a5;
-    --neutral-bg: #1f2b44;
-    --neutral-text: #a9b4c8;
-    --accent-soft: #15295a;
-    --track: #14254a;
-    --positive: #4ade80;
-    --negative: #f87171;
-    --app-bg: #0a1428;
-  }
+.theme-light {
+  color-scheme: light;
+}
+
+.theme-dark {
+  color-scheme: dark;
+}
+
+/* Wraps the app only to carry the theme and accent variables; takes no box of its own. */
+.theme-scope {
+  display: contents;
 }
 
 * {

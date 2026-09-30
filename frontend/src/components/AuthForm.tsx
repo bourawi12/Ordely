@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
+import PasswordRules from "@/components/PasswordRules";
 import { login, register, type AuthFormState } from "@/app/(auth)/actions";
 import styles from "@/app/(auth)/auth.module.css";
 
@@ -9,18 +10,32 @@ interface AuthFormProps {
   mode: "login" | "register";
   next?: string;
   notice?: string;
+  /** Shown above the title (e.g. a way back to a previous sign-up screen). */
+  header?: ReactNode;
+  /** Adds fields gathered outside this form before it is sent. */
+  prepare?: (form: FormData) => void;
 }
 
-export default function AuthForm({ mode, next, notice }: AuthFormProps) {
+export default function AuthForm({ mode, next, notice, header, prepare }: AuthFormProps) {
   const isLogin = mode === "login";
   const [state, action, pending] = useActionState<AuthFormState, FormData>(
     isLogin ? login : register,
     {},
   );
   const suffix = next ? `?next=${encodeURIComponent(next)}` : "";
+  // Sign-up only: drives the password checklist. React empties the field after each submit.
+  const [password, setPassword] = useState("");
+  useEffect(() => setPassword(""), [state]);
 
   return (
-    <form action={action} className={styles.form}>
+    <form
+      action={(form: FormData) => {
+        prepare?.(form);
+        action(form);
+      }}
+      className={styles.form}
+    >
+      {header}
       <h1>{isLogin ? "Connexion" : "Créer un compte"}</h1>
       <p className={styles.subtitle}>
         {isLogin
@@ -62,8 +77,15 @@ export default function AuthForm({ mode, next, notice }: AuthFormProps) {
           required
           minLength={isLogin ? undefined : 8}
           maxLength={72}
+          onChange={isLogin ? undefined : (e) => setPassword(e.target.value)}
+          aria-describedby={isLogin ? undefined : "password-rules"}
         />
       </label>
+      {!isLogin && (
+        <div className={styles.passwordRules}>
+          <PasswordRules id="password-rules" value={password} locale="fr" />
+        </div>
+      )}
       {!isLogin && (
         <label>
           Confirmer le mot de passe

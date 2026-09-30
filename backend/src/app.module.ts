@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { BoutiqueModule } from './boutique/boutique.module';
 import { CallsModule } from './calls/calls.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { MailModule } from './mail/mail.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StorageModule } from './storage/storage.module';
@@ -18,6 +19,7 @@ import { StorageModule } from './storage/storage.module';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     PrismaModule,
     StorageModule,
+    MailModule,
     AuthModule,
     BoutiqueModule,
     OrdersModule,
