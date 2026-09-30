@@ -1,5 +1,7 @@
 /* Ordely brand tokens — from the visual identity board. */
 .page {
+  /* Light-only design, whatever the device theme. */
+  color-scheme: light;
   --blue: #1e63ff;
   --blue-deep: #1450d6;
   --navy: #0b1f44;

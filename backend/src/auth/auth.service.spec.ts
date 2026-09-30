@@ -8,6 +8,8 @@ import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AuthService } from './auth.service';
@@ -23,6 +25,7 @@ describe('AuthService', () => {
   };
 
   const boutique = { create: jest.fn() };
+  const mail = { send: jest.fn() };
   const storage = {
     put: jest.fn(),
     remove: jest.fn(),
@@ -42,6 +45,7 @@ describe('AuthService', () => {
         AuthService,
         { provide: PrismaService, useValue: { user, boutique, $transaction } },
         { provide: StorageService, useValue: storage },
+        { provide: MailService, useValue: mail },
         {
           provide: JwtService,
           useValue: new JwtService({ secret: 'test-secret' }),
@@ -74,8 +78,33 @@ describe('AuthService', () => {
 
     expect($transaction).toHaveBeenCalledTimes(1);
     expect(boutique.create).toHaveBeenCalledTimes(1);
-    expect(user.create.mock.calls[0][0].data.boutiqueId).toBe(42);
+    expect(user.create.mock.calls[0][0].data).toMatchObject({
+      boutiqueId: 42,
+      // No look chosen: Ordely blue, following the device theme.
+      accentColor: null,
+      themeMode: 'system',
+    });
     expect(result.user).toMatchObject({ boutiqueId: 42 });
+  });
+
+  it('saves the accent colour and theme chosen at sign-up', async () => {
+    boutique.create.mockResolvedValue({ id: 42 });
+    user.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 1, createdAt: new Date(), ...data }),
+    );
+
+    const result = await service.register({
+      email: 'ada@example.com',
+      name: 'Ada',
+      password: 'correct horse',
+      accentColor: '#7c3aed',
+      themeMode: 'dark',
+    });
+
+    expect(result.user).toMatchObject({
+      accentColor: '#7c3aed',
+      themeMode: 'dark',
+    });
   });
 
   it('registers a user with a hashed password and never returns the hash', async () => {
@@ -98,6 +127,82 @@ describe('AuthService', () => {
     expect(jwt.verify(result.accessToken)).toMatchObject({
       sub: 1,
       email: 'ada@example.com',
+    });
+  });
+
+  describe('email verification', () => {
+    const sha256 = (value: string) =>
+      createHash('sha256').update(value).digest('hex');
+
+    it('stores only a hash of the token and emails the matching link', async () => {
+      boutique.create.mockResolvedValue({ id: 42 });
+      user.create.mockImplementation(({ data }) =>
+        Promise.resolve({ id: 1, createdAt: new Date(), ...data }),
+      );
+
+      const result = await service.register({
+        email: 'ada@example.com',
+        name: 'Ada',
+        password: 'Str0ng!pass',
+      });
+
+      const stored = user.create.mock.calls[0][0].data;
+      const { to, text } = mail.send.mock.calls[0][0];
+      const token = /verify-email\?token=([\w-]+)/.exec(text)?.[1] ?? '';
+      expect(to).toBe('ada@example.com');
+      expect(stored.emailVerifyTokenHash).toBe(sha256(token));
+      expect(stored).not.toHaveProperty('emailVerifiedAt');
+      // Neither the hash nor the token ever leaves the API.
+      expect(result.user).not.toHaveProperty('emailVerifyTokenHash');
+    });
+
+    it('confirms the address once, then refuses the same link', async () => {
+      user.findUnique.mockResolvedValueOnce({
+        id: 1,
+        email: 'ada@example.com',
+        emailVerifyExpiresAt: new Date(Date.now() + 60_000),
+      });
+      await expect(service.verifyEmail('the-token')).resolves.toEqual({
+        email: 'ada@example.com',
+      });
+      expect(user.findUnique).toHaveBeenCalledWith({
+        where: { emailVerifyTokenHash: sha256('the-token') },
+      });
+      expect(user.update.mock.calls[0][0].data).toMatchObject({
+        emailVerifiedAt: expect.any(Date),
+        emailVerifyTokenHash: null,
+      });
+
+      // The hash is gone, so nothing matches the second time.
+      user.findUnique.mockResolvedValueOnce(null);
+      await expect(service.verifyEmail('the-token')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('refuses an expired link', async () => {
+      user.findUnique.mockResolvedValue({
+        id: 1,
+        email: 'ada@example.com',
+        emailVerifyExpiresAt: new Date(Date.now() - 1),
+      });
+      await expect(service.verifyEmail('old-token')).rejects.toThrow(
+        'This link is invalid or has expired',
+      );
+      expect(user.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses to resend within a minute of the last email', async () => {
+      user.findUnique.mockResolvedValue({
+        id: 1,
+        email: 'ada@example.com',
+        emailVerifiedAt: null,
+        emailVerifySentAt: new Date(Date.now() - 10_000),
+      });
+      await expect(service.resendVerification(1)).rejects.toMatchObject({
+        status: 429,
+      });
+      expect(mail.send).not.toHaveBeenCalled();
     });
   });
 
@@ -167,6 +272,31 @@ describe('AuthService', () => {
       where: { id: 1 },
       data: { name: 'Ada Lovelace' },
     });
+  });
+
+  it('changes the theme, resets the accent with null and leaves omitted fields alone', async () => {
+    user.findUnique.mockResolvedValue({ id: 1 });
+    user.update.mockImplementation(({ data }) =>
+      Promise.resolve({
+        id: 1,
+        email: 'ada@example.com',
+        name: 'Ada',
+        ...data,
+      }),
+    );
+
+    await service.updateAppearance(1, { themeMode: 'dark' });
+    expect(user.update.mock.calls[0][0].data).toEqual({
+      accentColor: undefined,
+      themeMode: 'dark',
+    });
+
+    const result = await service.updateAppearance(1, { accentColor: null });
+    expect(user.update.mock.calls[1][0].data).toEqual({
+      accentColor: null,
+      themeMode: undefined,
+    });
+    expect(result).toMatchObject({ accentColor: null, avatarUrl: null });
   });
 
   it('changes password when current password matches', async () => {
@@ -248,14 +378,14 @@ describe('AuthService', () => {
       const text = Buffer.from('<?php echo "hi"; ?>');
       await expect(
         service.uploadAvatar(1, { buffer: text, size: text.length }),
-      ).rejects.toThrow('Format non pris en charge');
+      ).rejects.toThrow('Unsupported format');
       expect(storage.put).not.toHaveBeenCalled();
     });
 
     it('refuses images over 2 MB', async () => {
       await expect(
         service.uploadAvatar(1, { buffer: PNG, size: 2 * 1024 * 1024 + 1 }),
-      ).rejects.toThrow('2 Mo');
+      ).rejects.toThrow('2 MB');
       expect(storage.put).not.toHaveBeenCalled();
     });
   });

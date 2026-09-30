@@ -1,21 +1,27 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { MailService } from '../mail/mail.service';
+import { verifyEmailMessage } from '../mail/verify-email.template';
 import { PrismaService } from '../prisma/prisma.service';
 import { detectImageType } from '../storage/image-type';
 import { StorageService } from '../storage/storage.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateAppearanceDto } from './dto/update-appearance.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtPayload } from './jwt-payload';
 
@@ -26,8 +32,42 @@ const DUMMY_HASH = bcrypt.hashSync('timing-equalizer', BCRYPT_ROUNDS);
 /** Largest accepted profile picture, in bytes. */
 export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 
-/** A user as the API returns it: no password hash, and a signed URL instead of the storage key. */
-export type PublicUser = Omit<User, 'passwordHash' | 'avatarKey'> & {
+/** How long an emailed verification link works. */
+export const VERIFY_LINK_TTL_MS = 24 * 60 * 60 * 1000;
+/** Minimum time between two verification emails for the same account. */
+export const VERIFY_RESEND_COOLDOWN_MS = 60 * 1000;
+
+/** Only this hash is stored: a database leak must not hand out working links. */
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+/** A fresh link token and the columns that remember it. */
+function newVerifyToken() {
+  const token = randomBytes(32).toString('base64url');
+  const now = Date.now();
+  return {
+    token,
+    data: {
+      emailVerifyTokenHash: hashToken(token),
+      emailVerifyExpiresAt: new Date(now + VERIFY_LINK_TTL_MS),
+      emailVerifySentAt: new Date(now),
+    },
+  };
+}
+
+/**
+ * A user as the API returns it: no password hash or verification secrets, and a signed URL
+ * instead of the storage key.
+ */
+export type PublicUser = Omit<
+  User,
+  | 'passwordHash'
+  | 'avatarKey'
+  | 'emailVerifyTokenHash'
+  | 'emailVerifyExpiresAt'
+  | 'emailVerifySentAt'
+> & {
   avatarUrl: string | null;
 };
 
@@ -46,10 +86,13 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly storage: StorageService,
+    private readonly mail: MailService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResult> {
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    // The account stays closed until the emailed link is used.
+    const verify = newVerifyToken();
     try {
       // Every account comes with its own (empty) boutique, filled by the onboarding.
       const user = await this.prisma.$transaction(async (tx) => {
@@ -60,9 +103,18 @@ export class AuthService {
             name: dto.name,
             passwordHash,
             boutiqueId: boutique.id,
+            accentColor: dto.accentColor ?? null,
+            themeMode: dto.themeMode ?? 'system',
+            ...verify.data,
           },
         });
       });
+      // A failed send must not lose the account: the "check your inbox" page can resend.
+      await this.sendVerifyEmail(user, verify.token).catch((err: Error) =>
+        this.logger.error(
+          `Could not send the verification email: ${err.message}`,
+        ),
+      );
       return this.issueToken(user);
     } catch (err) {
       if (
@@ -114,6 +166,83 @@ export class AuthService {
     return this.publicUser(updated);
   }
 
+  /** Accent colour (null = the Ordely blue) and light/dark theme. */
+  async updateAppearance(
+    userId: number,
+    dto: UpdateAppearanceDto,
+  ): Promise<PublicUser> {
+    await this.findUser(userId);
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      // undefined leaves a column as it is; null resets the accent.
+      data: { accentColor: dto.accentColor, themeMode: dto.themeMode },
+    });
+    return this.publicUser(updated);
+  }
+
+  /** Confirms the address behind an emailed link. Each link works once. */
+  async verifyEmail(token: string): Promise<{ email: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { emailVerifyTokenHash: hashToken(token) },
+    });
+    if (!user?.emailVerifyExpiresAt || user.emailVerifyExpiresAt < new Date()) {
+      throw new BadRequestException('This link is invalid or has expired');
+    }
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: new Date(),
+        emailVerifyTokenHash: null,
+        emailVerifyExpiresAt: null,
+      },
+    });
+    return { email: user.email };
+  }
+
+  /** Emails a new link; the previous one stops working. */
+  async resendVerification(userId: number): Promise<{ sent: true }> {
+    const user = await this.findUser(userId);
+    if (user.emailVerifiedAt) {
+      throw new ConflictException('Email address already verified');
+    }
+    const last = user.emailVerifySentAt?.getTime() ?? 0;
+    if (Date.now() - last < VERIFY_RESEND_COOLDOWN_MS) {
+      throw new HttpException(
+        'Please wait a minute before asking for another email',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    const verify = newVerifyToken();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: verify.data,
+    });
+    try {
+      await this.sendVerifyEmail(user, verify.token);
+    } catch (err) {
+      this.logger.error(
+        `Could not send the verification email: ${(err as Error).message}`,
+      );
+      throw new ServiceUnavailableException(
+        'The email could not be sent. Try again in a few minutes.',
+      );
+    }
+    return { sent: true };
+  }
+
+  private async sendVerifyEmail(user: User, token: string) {
+    const appUrl = this.config
+      .get<string>('APP_URL', 'http://localhost:3200')
+      .replace(/\/+$/, '');
+    await this.mail.send(
+      verifyEmailMessage({
+        to: user.email,
+        name: user.name,
+        link: `${appUrl}/verify-email?token=${token}`,
+      }),
+    );
+  }
+
   async changePassword(
     userId: number,
     dto: ChangePasswordDto,
@@ -140,15 +269,15 @@ export class AuthService {
     file: { buffer: Buffer; size: number } | undefined,
   ): Promise<PublicUser> {
     if (!file?.buffer?.length) {
-      throw new BadRequestException('Choisissez une image à envoyer.');
+      throw new BadRequestException('Choose an image to upload.');
     }
     if (file.size > AVATAR_MAX_BYTES) {
-      throw new BadRequestException("L'image dépasse 2 Mo.");
+      throw new BadRequestException('The image is larger than 2 MB.');
     }
     const type = detectImageType(file.buffer);
     if (!type) {
       throw new BadRequestException(
-        'Format non pris en charge. Utilisez une image JPEG, PNG ou WebP.',
+        'Unsupported format. Use a JPEG, PNG or WebP image.',
       );
     }
 
@@ -191,8 +320,16 @@ export class AuthService {
   }
 
   private async publicUser(user: User): Promise<PublicUser> {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash, avatarKey, ...rest } = user;
+    const {
+      /* eslint-disable @typescript-eslint/no-unused-vars */
+      passwordHash,
+      avatarKey,
+      emailVerifyTokenHash,
+      emailVerifyExpiresAt,
+      emailVerifySentAt,
+      /* eslint-enable @typescript-eslint/no-unused-vars */
+      ...rest
+    } = user;
     return {
       ...rest,
       avatarUrl: avatarKey ? await this.storage.url(avatarKey) : null,

@@ -2,7 +2,9 @@
 
 import { redirect, unstable_rethrow } from "next/navigation";
 import { api, ApiError, type AuthResult } from "@/lib/api";
+import { isStrongPassword } from "@/lib/password";
 import { clearSession, safeNextPath, setSession } from "@/lib/session";
+import { HEX_COLOR, THEME_MODES, type ThemeMode } from "@/lib/theme";
 
 export interface AuthFormState {
   error?: string;
@@ -54,14 +56,39 @@ export async function register(
   const name = String(formData.get("name") ?? "");
   const password = String(formData.get("password") ?? "");
 
+  if (!isStrongPassword(password)) {
+    return {
+      error:
+        "Le mot de passe doit contenir au moins 8 caractères, dont une majuscule, une minuscule, un chiffre et un caractère spécial.",
+      email,
+      name,
+    };
+  }
   if (password !== String(formData.get("confirm") ?? "")) {
     return { error: "Passwords do not match.", email, name };
   }
 
+  // Look chosen on the first sign-up screen; anything unexpected falls back to the defaults.
+  const accent = String(formData.get("accentColor") ?? "");
+  const theme = String(formData.get("themeMode") ?? "");
+  const avatar = formData.get("avatar");
+
   try {
-    const result = await api.register({ email, name, password });
-    // A new account always continues with the short boutique onboarding.
-    await startSession(result, null, "/onboarding");
+    const result = await api.register({
+      email,
+      name,
+      password,
+      accentColor: HEX_COLOR.test(accent) ? accent : undefined,
+      themeMode: THEME_MODES.includes(theme as ThemeMode) ? (theme as ThemeMode) : undefined,
+    });
+    if (avatar instanceof File && avatar.size > 0) {
+      // The account exists either way: a refused picture can be added later in Settings.
+      const upload = new FormData();
+      upload.set("file", avatar);
+      await api.uploadAvatar(upload, result.accessToken).catch(() => undefined);
+    }
+    // A new account first confirms its email address, then goes through the onboarding.
+    await startSession(result, null, "/verify-email");
   } catch (err) {
     unstable_rethrow(err);
     return { error: errorMessage(err), email, name };

@@ -1,0 +1,181 @@
+/* Sign-up personalization screen. Sits inside the light-only auth card (auth.module.css) and
+   inherits its palette; --accent is the colour being picked (set by RegisterFlow). The colour and
+   theme pickers bring their own styles (components/appearance). */
+.flow {
+  /* The account form on screen 2 (auth.module.css) takes the picked colour too. */
+  --blue: var(--accent);
+  width: 100%;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.kicker {
+  margin: 0 0 0.35rem;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  margin: 0.4rem 0 0;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.section legend {
+  margin-bottom: 0.75rem;
+  padding: 0;
+  color: var(--navy);
+  font-weight: 600;
+}
+
+/* ---------- Picture ---------- */
+.picture {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--sky);
+  color: var(--ink-soft);
+  border: 1.5px dashed var(--line);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pictureBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pictureBody small {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.pictureBody small.pictureError {
+  color: #b42318;
+}
+
+.pictureActions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.upload {
+  /* globals.css stacks every <label> vertically; this one is a button. */
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  color: var(--navy);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.upload:hover,
+.upload:focus-within {
+  border-color: var(--accent);
+}
+
+.linkButton {
+  padding: 0;
+  background: none;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.linkButton:hover {
+  color: #b42318;
+}
+
+/* ---------- Actions ---------- */
+.next {
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.next:hover {
+  filter: brightness(0.93);
+}
+
+.switch {
+  margin: -0.5rem 0 0;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.switch a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.stepBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.stepBar .kicker {
+  margin: 0;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.2rem;
+  margin-left: -0.2rem;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.back:hover {
+  background: var(--sky);
+  color: var(--navy);
+}
