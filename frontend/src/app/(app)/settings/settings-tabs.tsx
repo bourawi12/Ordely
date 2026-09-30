@@ -75,7 +75,7 @@ export function SettingsTabs({
                 className={`${styles.tabBtn} ${isActive ? styles.tabBtnActive : ""
                   }`}
               >
-                <Icon name={tab.icon as any} size={16} />
+                <Icon name={tab.icon as IconName} size={16} />
                 <span>{tab.label}</span>
               </button>
             );
