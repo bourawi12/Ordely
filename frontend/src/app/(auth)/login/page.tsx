@@ -13,7 +13,11 @@ export default async function LoginPage({
     <AuthForm
       mode="login"
       next={next}
-      notice={expired ? "Votre session a expiré. Veuillez vous reconnecter." : undefined}
+      notice={
+        expired
+          ? "Votre session a expiré. Veuillez vous reconnecter."
+          : undefined
+      }
     />
   );
 }

@@ -13,6 +13,7 @@ describe('App (e2e)', () => {
   const email = `e2e-${Date.now()}@example.com`;
   // A second merchant, to prove one shop never reaches another's orders.
   const otherEmail = `e2e-other-${Date.now()}@example.com`;
+  const resetEmail = `e2e-reset-${Date.now()}@example.com`;
   // Meets the password rule (upper, lower, digit, special character).
   const PASSWORD = 'Passw0rd!e2e';
   // Emails are kept here instead of going out over SMTP.
@@ -43,7 +44,7 @@ describe('App (e2e)', () => {
   });
 
   afterAll(async () => {
-    const emails = { email: { in: [email, otherEmail] } };
+    const emails = { email: { in: [email, otherEmail, resetEmail] } };
     const users = await prisma.user.findMany({ where: emails });
     await prisma.user.deleteMany({ where: emails });
     await prisma.boutique.deleteMany({
@@ -621,6 +622,64 @@ describe('App (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ customer: '', quantity: 0 })
         .expect(400);
+    });
+  });
+
+  describe('password reset', () => {
+    it('emails a single-use link that sets the password, ends old sessions and signs in', async () => {
+      const server = app.getHttpServer();
+      const registered = await request(server)
+        .post('/auth/register')
+        .send({ email: resetEmail, name: 'Reset', password: PASSWORD })
+        .expect(201);
+      const oldSession = {
+        Authorization: `Bearer ${registered.body.accessToken}`,
+      };
+
+      // Unknown addresses get the very same answer.
+      await request(server)
+        .post('/auth/forgot-password')
+        .send({ email: 'nobody-e2e@example.com' })
+        .expect(200)
+        .expect((res) => expect(res.body).toEqual({ sent: true }));
+      await request(server)
+        .post('/auth/forgot-password')
+        .send({ email: resetEmail.toUpperCase() })
+        .expect(200)
+        .expect((res) => expect(res.body).toEqual({ sent: true }));
+      const mail = sentMail.filter((m) => m.to === resetEmail).pop();
+      const linkToken =
+        /reset-password\?token=([\w-]+)/.exec(mail?.text ?? '')?.[1] ?? '';
+      expect(linkToken).not.toBe('');
+
+      await request(server)
+        .post('/auth/reset-password')
+        .send({ token: linkToken, password: 'weak' })
+        .expect(400);
+      // Sessions are dated to the second: make sure the old one is strictly older.
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      const NEW_PASSWORD = 'N3w!Passw0rd';
+      const reset = await request(server)
+        .post('/auth/reset-password')
+        .send({ token: linkToken, password: NEW_PASSWORD })
+        .expect(200);
+      const newSession = { Authorization: `Bearer ${reset.body.accessToken}` };
+
+      // The link proved the address: the new session opens the app right away.
+      await request(server).get('/boutique').set(newSession).expect(200);
+      await request(server).get('/auth/me').set(oldSession).expect(401);
+      await request(server)
+        .post('/auth/reset-password')
+        .send({ token: linkToken, password: 'An0ther!pass' })
+        .expect(400);
+      await request(server)
+        .post('/auth/login')
+        .send({ email: resetEmail, password: PASSWORD })
+        .expect(401);
+      await request(server)
+        .post('/auth/login')
+        .send({ email: resetEmail, password: NEW_PASSWORD })
+        .expect(200);
     });
   });
 });

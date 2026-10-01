@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState, type ReactNode } from "react";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import PasswordRules from "@/components/PasswordRules";
 import { login, register, type AuthFormState } from "@/app/(auth)/actions";
 import styles from "@/app/(auth)/auth.module.css";
@@ -16,7 +22,13 @@ interface AuthFormProps {
   prepare?: (form: FormData) => void;
 }
 
-export default function AuthForm({ mode, next, notice, header, prepare }: AuthFormProps) {
+export default function AuthForm({
+  mode,
+  next,
+  notice,
+  header,
+  prepare,
+}: AuthFormProps) {
   const isLogin = mode === "login";
   const [state, action, pending] = useActionState<AuthFormState, FormData>(
     isLogin ? login : register,
@@ -26,6 +38,18 @@ export default function AuthForm({ mode, next, notice, header, prepare }: AuthFo
   // Sign-up only: drives the password checklist. React empties the field after each submit.
   const [password, setPassword] = useState("");
   useEffect(() => setPassword(""), [state]);
+  // Login only: the "forgot password" link carries the address typed so far.
+  const emailRef = useRef<HTMLInputElement>(null);
+  const [forgotHref, setForgotHref] = useState("/forgot-password");
+
+  function updateForgot() {
+    const email = emailRef.current?.value.trim();
+    setForgotHref(
+      email
+        ? `/forgot-password?email=${encodeURIComponent(email)}`
+        : "/forgot-password",
+    );
+  }
 
   return (
     <form
@@ -55,7 +79,13 @@ export default function AuthForm({ mode, next, notice, header, prepare }: AuthFo
       {!isLogin && (
         <label>
           Nom complet
-          <input name="name" autoComplete="name" required maxLength={100} defaultValue={state.name} />
+          <input
+            name="name"
+            autoComplete="name"
+            required
+            maxLength={100}
+            defaultValue={state.name}
+          />
         </label>
       )}
       <label>
@@ -66,6 +96,7 @@ export default function AuthForm({ mode, next, notice, header, prepare }: AuthFo
           autoComplete="email"
           required
           defaultValue={state.email}
+          ref={emailRef}
         />
       </label>
       <label>
@@ -81,6 +112,17 @@ export default function AuthForm({ mode, next, notice, header, prepare }: AuthFo
           aria-describedby={isLogin ? undefined : "password-rules"}
         />
       </label>
+      {isLogin && (
+        <Link
+          href={forgotHref}
+          className={styles.forgot}
+          onMouseEnter={() => updateForgot()}
+          onFocus={() => updateForgot()}
+          onClick={() => updateForgot()}
+        >
+          Mot de passe oublié ?
+        </Link>
+      )}
       {!isLogin && (
         <div className={styles.passwordRules}>
           <PasswordRules id="password-rules" value={password} locale="fr" />
@@ -89,18 +131,30 @@ export default function AuthForm({ mode, next, notice, header, prepare }: AuthFo
       {!isLogin && (
         <label>
           Confirmer le mot de passe
-          <input name="confirm" type="password" autoComplete="new-password" required minLength={8} maxLength={72} />
+          <input
+            name="confirm"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            maxLength={72}
+          />
         </label>
       )}
 
       <button type="submit" disabled={pending} className={styles.submit}>
-        {pending ? "Veuillez patienter…" : isLogin ? "Se connecter" : "Créer mon compte"}
+        {pending
+          ? "Veuillez patienter…"
+          : isLogin
+            ? "Se connecter"
+            : "Créer mon compte"}
       </button>
 
       <p className={styles.switch}>
         {isLogin ? (
           <>
-            Pas encore de compte ? <Link href={`/register${suffix}`}>Créer un compte</Link>
+            Pas encore de compte ?{" "}
+            <Link href={`/register${suffix}`}>Créer un compte</Link>
           </>
         ) : (
           <>

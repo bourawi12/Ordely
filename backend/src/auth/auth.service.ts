@@ -14,6 +14,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { MailService } from '../mail/mail.service';
+import { resetPasswordMessage } from '../mail/reset-password.template';
 import { verifyEmailMessage } from '../mail/verify-email.template';
 import { PrismaService } from '../prisma/prisma.service';
 import { detectImageType } from '../storage/image-type';
@@ -36,6 +37,11 @@ export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 export const VERIFY_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 /** Minimum time between two verification emails for the same account. */
 export const VERIFY_RESEND_COOLDOWN_MS = 60 * 1000;
+
+/** How long an emailed "forgot password" link works. */
+export const RESET_LINK_TTL_MS = 60 * 60 * 1000;
+/** Minimum time between two reset emails for the same account. */
+export const RESET_RESEND_COOLDOWN_MS = 60 * 1000;
 
 /** Only this hash is stored: a database leak must not hand out working links. */
 function hashToken(token: string): string {
@@ -67,6 +73,10 @@ export type PublicUser = Omit<
   | 'emailVerifyTokenHash'
   | 'emailVerifyExpiresAt'
   | 'emailVerifySentAt'
+  | 'passwordResetTokenHash'
+  | 'passwordResetExpiresAt'
+  | 'passwordResetSentAt'
+  | 'passwordChangedAt'
 > & {
   avatarUrl: string | null;
 };
@@ -243,6 +253,87 @@ export class AuthService {
     );
   }
 
+  /**
+   * Emails a link to choose a new password. Answers the same whether or not the address has an
+   * account, so the form can't be used to find out who is a customer; a second request within a
+   * minute sends nothing. A new link replaces the previous one.
+   */
+  async requestPasswordReset(email: string): Promise<{ sent: true }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    const last = user?.passwordResetSentAt?.getTime() ?? 0;
+    if (!user || Date.now() - last < RESET_RESEND_COOLDOWN_MS) {
+      return { sent: true };
+    }
+    const token = randomBytes(32).toString('base64url');
+    const now = Date.now();
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetTokenHash: hashToken(token),
+        passwordResetExpiresAt: new Date(now + RESET_LINK_TTL_MS),
+        passwordResetSentAt: new Date(now),
+      },
+    });
+    const appUrl = this.config
+      .get<string>('APP_URL', 'http://localhost:3200')
+      .replace(/\/+$/, '');
+    try {
+      await this.mail.send(
+        resetPasswordMessage({
+          to: user.email,
+          name: user.name,
+          link: `${appUrl}/reset-password?token=${token}`,
+        }),
+      );
+    } catch (err) {
+      this.logger.error(
+        `Could not send the password reset email: ${(err as Error).message}`,
+      );
+      throw new ServiceUnavailableException(
+        'The email could not be sent. Try again in a few minutes.',
+      );
+    }
+    return { sent: true };
+  }
+
+  /**
+   * Sets the password chosen through an emailed link, once, and signs the user in. Sessions
+   * opened before (on any device) stop working. The link also proves the address, so an
+   * unverified account becomes verified.
+   */
+  async resetPassword(token: string, password: string): Promise<AuthResult> {
+    const tokenHash = hashToken(token);
+    const user = await this.prisma.user.findUnique({
+      where: { passwordResetTokenHash: tokenHash },
+    });
+    if (
+      !user?.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt < new Date()
+    ) {
+      throw new BadRequestException('This link is invalid or has expired');
+    }
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    // Whole seconds, like a token's "iat": the session issued below must stay valid.
+    const changedAt = new Date(Math.floor(Date.now() / 1000) * 1000);
+    // Matching the hash again makes the link single-use even if it is opened twice at once.
+    const { count } = await this.prisma.user.updateMany({
+      where: { id: user.id, passwordResetTokenHash: tokenHash },
+      data: {
+        passwordHash,
+        passwordChangedAt: changedAt,
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null,
+        emailVerifiedAt: user.emailVerifiedAt ?? changedAt,
+        emailVerifyTokenHash: null,
+        emailVerifyExpiresAt: null,
+      },
+    });
+    if (count === 0) {
+      throw new BadRequestException('This link is invalid or has expired');
+    }
+    return this.issueToken(await this.findUser(user.id));
+  }
+
   async changePassword(
     userId: number,
     dto: ChangePasswordDto,
@@ -327,6 +418,10 @@ export class AuthService {
       emailVerifyTokenHash,
       emailVerifyExpiresAt,
       emailVerifySentAt,
+      passwordResetTokenHash,
+      passwordResetExpiresAt,
+      passwordResetSentAt,
+      passwordChangedAt,
       /* eslint-enable @typescript-eslint/no-unused-vars */
       ...rest
     } = user;

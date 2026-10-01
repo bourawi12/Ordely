@@ -4,7 +4,7 @@ import Icon from "@/components/Icon";
 import ui from "@/components/app/ui.module.css";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import { PasswordForm } from "../settings-forms";
+import { PasswordForm, ResetLinkForm } from "../settings-forms";
 import styles from "../settings.module.css";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,7 @@ export default async function SecuritySettingsPage() {
         <p>Your password and this browser&apos;s session.</p>
       </header> */}
       <PasswordForm />
+      <ResetLinkForm />
 
       <section className={`${ui.card} ${styles.card}`}>
         <div className={styles.cardBody}>
@@ -35,7 +36,9 @@ export default async function SecuritySettingsPage() {
           </dl>
         </div>
         <form action={logout} className={styles.cardFoot}>
-          <p className={styles.status}>Logging out only ends the session on this browser.</p>
+          <p className={styles.status}>
+            Logging out only ends the session on this browser.
+          </p>
           <button type="submit" className={ui.btnGhost}>
             <Icon name="logout" size={17} />
             Log out
