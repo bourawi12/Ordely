@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type BoutiqueSection } from "@/lib/api";
 import { isStrongPassword } from "@/lib/password";
 import { HEX_COLOR, THEME_MODES, type ThemeMode } from "@/lib/theme";
 
@@ -143,4 +143,71 @@ async function removeAvatar(): Promise<SettingsActionState> {
   }
   revalidatePath("/", "layout");
   return { success: "Profile picture removed." };
+}
+
+export interface ShopActionState extends SettingsActionState {
+  /** What the merchant typed, sent back so a refused save loses nothing. */
+  values?: Record<string, string | string[] | undefined>;
+}
+
+async function saveShop(
+  section: BoutiqueSection,
+  values: NonNullable<ShopActionState["values"]>,
+  success: string,
+): Promise<ShopActionState> {
+  try {
+    await api.updateBoutique(section, values);
+  } catch (err) {
+    unstable_rethrow(err);
+    return { error: errorMessage(err, "Could not save your shop."), values };
+  }
+  revalidatePath("/settings");
+  return { success };
+}
+
+function text(formData: FormData, key: string): string {
+  return String(formData.get(key) ?? "").trim();
+}
+
+function optional(formData: FormData, key: string): string | undefined {
+  return text(formData, key) || undefined;
+}
+
+export async function updateShopIdentity(_prev: ShopActionState, formData: FormData) {
+  return saveShop(
+    "identity",
+    {
+      name: text(formData, "name"),
+      businessPhone: text(formData, "businessPhone"),
+      platform: text(formData, "platform"),
+    },
+    "Shop saved.",
+  );
+}
+
+export async function updateShopAgent(_prev: ShopActionState, formData: FormData) {
+  return saveShop(
+    "agent",
+    {
+      callLanguages: formData.getAll("callLanguages").map(String),
+      callStartTime: text(formData, "callStartTime"),
+      callEndTime: text(formData, "callEndTime"),
+      confirmationProcess: optional(formData, "confirmationProcess"),
+    },
+    "Call agent saved.",
+  );
+}
+
+export async function updateShopDetails(_prev: ShopActionState, formData: FormData) {
+  return saveShop(
+    "details",
+    {
+      sector: optional(formData, "sector"),
+      deliveryZones: formData.getAll("deliveryZones").map(String),
+      dailyOrderVolume: optional(formData, "dailyOrderVolume"),
+      acquisitionSource: optional(formData, "acquisitionSource"),
+      carrier: optional(formData, "carrier"),
+    },
+    "Business details saved.",
+  );
 }

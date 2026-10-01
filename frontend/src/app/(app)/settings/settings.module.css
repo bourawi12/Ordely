@@ -251,6 +251,48 @@
   pointer-events: none;
 }
 
+/* ---------- Shop: checkbox groups ---------- */
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.25rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.checks legend {
+  margin-bottom: 0.5rem;
+  padding: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.checkLine {
+  /* globals.css stacks every <label> vertically; a checkbox sits next to its text. */
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.checkLine input {
+  accent-color: var(--accent);
+}
+
+.zones {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem 1rem;
+  width: 100%;
+}
+
+.zones[aria-disabled="true"] {
+  opacity: 0.5;
+}
+
 /* ---------- Profile picture ---------- */
 .avatarCard {
   flex-direction: row;
