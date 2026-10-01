@@ -5,12 +5,14 @@ import {
   Header,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
 import { CallsService } from './calls.service';
 import { CallFiltersDto, ListCallsDto } from './dto/list-calls.dto';
 import { QueueCallDto } from './dto/queue-call.dto';
+import { UpdateCallDto } from './dto/update-call.dto';
 
 @Controller('calls')
 export class CallsController {
@@ -23,6 +25,7 @@ export class CallsController {
 
   @Get('export')
   @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="calls.csv"')
   export(@Query() filters: CallFiltersDto) {
     return this.callsService.exportCsv(filters);
   }
@@ -35,6 +38,14 @@ export class CallsController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.callsService.findOne(id);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCallDto,
+  ) {
+    return this.callsService.update(id, dto);
   }
 
   @Post()
