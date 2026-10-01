@@ -11,6 +11,8 @@ describe('App (e2e)', () => {
   let prisma: PrismaService;
   let token: string;
   const email = `e2e-${Date.now()}@example.com`;
+  // A second merchant, to prove one shop never reaches another's orders.
+  const otherEmail = `e2e-other-${Date.now()}@example.com`;
   // Meets the password rule (upper, lower, digit, special character).
   const PASSWORD = 'Passw0rd!e2e';
   // Emails are kept here instead of going out over SMTP.
@@ -41,8 +43,9 @@ describe('App (e2e)', () => {
   });
 
   afterAll(async () => {
-    const users = await prisma.user.findMany({ where: { email } });
-    await prisma.user.deleteMany({ where: { email } });
+    const emails = { email: { in: [email, otherEmail] } };
+    const users = await prisma.user.findMany({ where: emails });
+    await prisma.user.deleteMany({ where: emails });
     await prisma.boutique.deleteMany({
       where: { id: { in: users.map((u) => u.boutiqueId) } },
     });
@@ -487,8 +490,129 @@ describe('App (e2e)', () => {
         .send({ status: 'confirmed' })
         .expect(200)
         .expect((res) => expect(res.body.status).toBe('confirmed'));
+      await request(server)
+        .patch(`/orders/${id}`)
+        .set(auth)
+        .send({ customer: '  Edited  ', quantity: 3, total: 60 })
+        .expect(200)
+        .expect((res) =>
+          expect(res.body).toMatchObject({
+            customer: 'Edited',
+            quantity: 3,
+            total: '60',
+            status: 'confirmed',
+          }),
+        );
+      await request(server)
+        .patch(`/orders/${id}`)
+        .set(auth)
+        .send({ quantity: 0 })
+        .expect(400);
       await request(server).delete(`/orders/${id}`).set(auth).expect(204);
       await request(server).get(`/orders/${id}`).set(auth).expect(404);
+    });
+
+    it("keeps each shop's orders, calls and dashboard to itself", async () => {
+      const server = app.getHttpServer();
+      const auth = { Authorization: `Bearer ${token}` };
+      const mine = await request(server)
+        .post('/orders')
+        .set(auth)
+        .send({
+          customer: 'Mine',
+          phone: '+216 22 000 001',
+          item: 'Private item',
+          quantity: 1,
+          total: 10,
+        })
+        .expect(201);
+      const id = mine.body.id;
+      const call = await request(server)
+        .post('/calls')
+        .set(auth)
+        .send({ orderId: id })
+        .expect(201);
+
+      await request(server)
+        .post('/auth/register')
+        .send({ email: otherEmail, name: 'Other', password: PASSWORD })
+        .expect(201);
+      await prisma.user.update({
+        where: { email: otherEmail },
+        data: { emailVerifiedAt: new Date() },
+      });
+      const login = await request(server)
+        .post('/auth/login')
+        .send({ email: otherEmail, password: PASSWORD })
+        .expect(200);
+      const other = { Authorization: `Bearer ${login.body.accessToken}` };
+
+      await request(server)
+        .get('/orders')
+        .set(other)
+        .expect(200)
+        .expect((res) => expect(res.body).toEqual([]));
+      await request(server).get(`/orders/${id}`).set(other).expect(404);
+      await request(server)
+        .patch(`/orders/${id}`)
+        .set(other)
+        .send({ status: 'cancelled' })
+        .expect(404);
+      await request(server).delete(`/orders/${id}`).set(other).expect(404);
+      await request(server)
+        .post('/calls')
+        .set(other)
+        .send({ orderId: id })
+        .expect(404);
+      await request(server)
+        .get(`/calls/${call.body.id}`)
+        .set(other)
+        .expect(404);
+      await request(server)
+        .get('/calls?range=all')
+        .set(other)
+        .expect(200)
+        .expect((res) => expect(res.body.total).toBe(0));
+      await request(server)
+        .post('/calls/queue-pending')
+        .set(other)
+        .expect(201)
+        .expect((res) => expect(res.body).toEqual({ queued: 0 }));
+      await request(server)
+        .get('/dashboard/summary')
+        .set(other)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.pendingCount).toBe(0);
+          expect(res.body.stats.totalOrders.value).toBe(0);
+        });
+
+      await request(server)
+        .get('/analytics?range=7d')
+        .set(other)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.kpis.orders.value).toBe(0);
+          expect(res.body.byProduct).toEqual([]);
+        });
+      await request(server)
+        .get('/analytics?range=7d')
+        .set(auth)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.kpis.orders.value).toBeGreaterThanOrEqual(1);
+          expect(
+            res.body.byProduct.map((p: { item: string }) => p.item),
+          ).toContain('Private item');
+        });
+      await request(server).get('/analytics?range=1y').set(auth).expect(400);
+
+      // Untouched for its owner.
+      await request(server)
+        .get(`/orders/${id}`)
+        .set(auth)
+        .expect(200)
+        .expect((res) => expect(res.body.status).toBe('pending'));
     });
 
     it('rejects invalid orders', () => {

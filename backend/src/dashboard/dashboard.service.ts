@@ -18,7 +18,9 @@ export class DashboardService {
     private readonly config: ConfigService,
   ) {}
 
-  async summary() {
+  /** Everything is scoped to one shop: its orders, and the calls made for them. */
+  async summary(boutiqueId: number) {
+    const calls = { order: { boutiqueId } } satisfies Prisma.CallWhereInput;
     const now = Date.now();
     const current = { gte: new Date(now - WINDOW_DAYS * DAY_MS) };
     const previous = {
@@ -37,14 +39,15 @@ export class DashboardService {
       pendingCount,
     ] = await Promise.all([
       this.metric(
-        (createdAt) => this.prisma.order.count({ where: { createdAt } }),
+        (createdAt) =>
+          this.prisma.order.count({ where: { boutiqueId, createdAt } }),
         current,
         previous,
       ),
       this.metric(
         (createdAt) =>
           this.prisma.order.count({
-            where: { createdAt, status: 'confirmed' },
+            where: { boutiqueId, createdAt, status: 'confirmed' },
           }),
         current,
         previous,
@@ -52,7 +55,11 @@ export class DashboardService {
       this.metric(
         (createdAt) =>
           this.prisma.call.count({
-            where: { createdAt, status: { in: ['failed', 'no_answer'] } },
+            where: {
+              ...calls,
+              createdAt,
+              status: { in: ['failed', 'no_answer'] },
+            },
           }),
         current,
         previous,
@@ -60,7 +67,7 @@ export class DashboardService {
       this.metric(
         async (createdAt) => {
           const agg = await this.prisma.call.aggregate({
-            where: { createdAt, durationSeconds: { not: null } },
+            where: { ...calls, createdAt, durationSeconds: { not: null } },
             _avg: { durationSeconds: true },
           });
           return Math.round(agg._avg.durationSeconds ?? 0);
@@ -68,15 +75,15 @@ export class DashboardService {
         current,
         previous,
       ),
-      this.confirmationsLast7Days(),
+      this.confirmationsLast7Days(boutiqueId),
       this.prisma.call.findMany({
-        where: { status: { not: 'pending' } },
+        where: { ...calls, status: { not: 'pending' } },
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: { order: { select: { id: true, customer: true } } },
       }),
       this.prisma.order.findMany({
-        where: { status: 'pending' },
+        where: { boutiqueId, status: 'pending' },
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: {
@@ -87,7 +94,7 @@ export class DashboardService {
           },
         },
       }),
-      this.prisma.order.count({ where: { status: 'pending' } }),
+      this.prisma.order.count({ where: { boutiqueId, status: 'pending' } }),
     ]);
 
     return {
@@ -112,7 +119,7 @@ export class DashboardService {
   }
 
   /** Confirmed calls per local day for the last 7 days (oldest first, zero-filled). */
-  private confirmationsLast7Days() {
+  private confirmationsLast7Days(boutiqueId: number) {
     const tz = this.config.get<string>('APP_TIMEZONE', DEFAULT_TIMEZONE);
     return this.prisma.$queryRaw<
       { date: string; confirmed: number }[]
@@ -127,9 +134,13 @@ export class DashboardService {
       SELECT to_char(days.day, 'YYYY-MM-DD') AS date,
              COUNT(calls.id)::int AS confirmed
       FROM days
-      LEFT JOIN calls
-        ON calls.status = 'confirmed'
-       AND (calls."createdAt" AT TIME ZONE ${tz})::date = days.day
+      LEFT JOIN (
+        SELECT calls.id, calls."createdAt"
+        FROM calls
+        JOIN orders ON orders.id = calls."orderId"
+        WHERE calls.status = 'confirmed' AND orders."boutiqueId" = ${boutiqueId}
+      ) calls
+        ON (calls."createdAt" AT TIME ZONE ${tz})::date = days.day
       GROUP BY days.day
       ORDER BY days.day
     `);

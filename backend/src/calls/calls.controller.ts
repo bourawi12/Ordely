@@ -8,6 +8,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { CurrentBoutique } from '../auth/current-user.decorator';
 import { CallsService } from './calls.service';
 import { CallFiltersDto, ListCallsDto } from './dto/list-calls.dto';
 import { QueueCallDto } from './dto/queue-call.dto';
@@ -17,33 +18,39 @@ export class CallsController {
   constructor(private readonly callsService: CallsService) {}
 
   @Get()
-  list(@Query() query: ListCallsDto) {
-    return this.callsService.list(query);
+  list(@CurrentBoutique() boutiqueId: number, @Query() query: ListCallsDto) {
+    return this.callsService.list(boutiqueId, query);
   }
 
   @Get('export')
   @Header('Content-Type', 'text/csv; charset=utf-8')
-  export(@Query() filters: CallFiltersDto) {
-    return this.callsService.exportCsv(filters);
+  export(
+    @CurrentBoutique() boutiqueId: number,
+    @Query() filters: CallFiltersDto,
+  ) {
+    return this.callsService.exportCsv(boutiqueId, filters);
   }
 
   @Get('usage')
-  usage() {
-    return this.callsService.usage();
+  usage(@CurrentBoutique() boutiqueId: number) {
+    return this.callsService.usage(boutiqueId);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.callsService.findOne(id);
+  findOne(
+    @CurrentBoutique() boutiqueId: number,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.callsService.findOne(boutiqueId, id);
   }
 
   @Post()
-  queue(@Body() dto: QueueCallDto) {
-    return this.callsService.queue(dto.orderId);
+  queue(@CurrentBoutique() boutiqueId: number, @Body() dto: QueueCallDto) {
+    return this.callsService.queue(boutiqueId, dto.orderId);
   }
 
   @Post('queue-pending')
-  queueAllPending() {
-    return this.callsService.queueAllPending();
+  queueAllPending(@CurrentBoutique() boutiqueId: number) {
+    return this.callsService.queueAllPending(boutiqueId);
   }
 }

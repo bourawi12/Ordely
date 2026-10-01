@@ -73,6 +73,35 @@ export interface DashboardSummary {
   pendingCount: number;
 }
 
+export type AnalyticsRange = "7d" | "30d" | "90d";
+
+export interface Analytics {
+  range: AnalyticsRange;
+  from: string;
+  to: string;
+  kpis: {
+    orders: Metric;
+    /** 0–1: confirmed orders / orders placed. */
+    confirmationRate: Metric;
+    confirmedRevenue: Metric;
+    cancelledValue: Metric;
+    /** 0–1: answered calls / finished calls. */
+    answerRate: Metric;
+    avgAttempts: Metric;
+    avgMinutesToConfirm: Metric;
+    avgOrderValue: Metric;
+  };
+  outcomes: { confirmed: number; cancelled: number; pending: number };
+  callOutcomes: Record<CallStatus, number>;
+  daily: { date: string; confirmed: number; cancelled: number; pending: number }[];
+  byHour: { hour: number; calls: number; answered: number; confirmed: number }[];
+  /** 1 = Monday … 7 = Sunday. */
+  byWeekday: { weekday: number; orders: number; confirmed: number }[];
+  byProduct: { item: string; orders: number; confirmed: number; cancelled: number; revenue: number }[];
+  byLanguage: { language: string; calls: number; confirmed: number; avgDuration: number }[];
+  byAttempt: { attempt: number; calls: number; confirmed: number }[];
+}
+
 export interface Usage {
   plan: string;
   used: number;
@@ -273,6 +302,7 @@ completeOnboarding: () =>
     method: "POST",
   }),
   dashboard: () => request<DashboardSummary>("/dashboard/summary"),
+  analytics: (range: AnalyticsRange) => request<Analytics>(`/analytics?range=${range}`),
   usage: () => request<Usage>("/calls/usage"),
   listCalls: (filters: CallFilters) =>
     request<CallsPage>(`/calls${query({ ...filters })}`),
@@ -284,14 +314,20 @@ completeOnboarding: () =>
     request<Call>("/calls", { method: "POST", body: JSON.stringify({ orderId }) }),
   queueAllPending: () =>
     request<{ queued: number }>("/calls/queue-pending", { method: "POST" }),
-  listOrders: () => request<Order[]>("/orders"),
+  listOrders: (status?: OrderStatus) =>
+    request<Order[]>(`/orders${status ? `?status=${status}` : ""}`),
   getOrder: (id: number) =>
     request<Order & { calls: Call[] }>(`/orders/${id}`),
   createOrder: (
     data: Pick<Order, "customer" | "phone" | "item" | "quantity"> & { total: number },
   ) =>
     request<Order>("/orders", { method: "POST", body: JSON.stringify(data) }),
-  updateOrder: (id: number, data: { status: OrderStatus }) =>
+  updateOrder: (
+    id: number,
+    data: Partial<
+      Pick<Order, "status" | "customer" | "phone" | "item" | "quantity"> & { total: number }
+    >,
+  ) =>
     request<Order>(`/orders/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
