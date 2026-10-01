@@ -18,8 +18,10 @@ import { AUTH_UPLOAD_LIMIT_BYTES } from './auth.constants';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateAppearanceDto } from './dto/update-appearance.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -45,6 +47,26 @@ export class AuthController {
   @HttpCode(200)
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  /** Same answer whether the address has an account or not. Rate-limited per address. */
+  @Public()
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('forgot-password')
+  @HttpCode(200)
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(dto.email);
+  }
+
+  /** Public: the emailed link is opened without a session. Signs the user in on success. */
+  @Public()
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('reset-password')
+  @HttpCode(200)
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.password);
   }
 
   /** Public: the link may be opened on another device, without a session. */

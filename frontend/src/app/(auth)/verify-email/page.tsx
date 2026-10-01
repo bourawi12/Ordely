@@ -41,8 +41,9 @@ async function CheckInbox() {
       </span>
       <h1>Vérifiez votre boîte mail</h1>
       <p className={verify.text}>
-        Nous avons envoyé un lien de confirmation à <strong>{user.email}</strong>. Cliquez dessus
-        pour activer votre compte : le lien est valable 24 heures.
+        Nous avons envoyé un lien de confirmation à{" "}
+        <strong>{user.email}</strong>. Cliquez dessus pour activer votre compte
+        : le lien est valable 24 heures.
       </p>
       <ResendForm />
       <form action={logout} className={verify.switch}>
@@ -73,8 +74,8 @@ async function LinkResult({ token }: { token: string }) {
         </span>
         <h1>Adresse confirmée</h1>
         <p className={verify.text}>
-          <strong>{email}</strong> est vérifiée : votre compte est actif. Il ne reste qu&apos;à
-          configurer votre boutique.
+          <strong>{email}</strong> est vérifiée : votre compte est actif. Il ne
+          reste qu&apos;à configurer votre boutique.
         </p>
         <Link
           href={signedIn ? "/onboarding" : "/login?next=/onboarding"}
@@ -93,8 +94,9 @@ async function LinkResult({ token }: { token: string }) {
       </span>
       <h1>Ce lien n&apos;est plus valide</h1>
       <p className={verify.text}>
-        Il a déjà servi ou il a expiré (un lien est valable 24 heures). Si votre adresse est déjà
-        confirmée, connectez-vous simplement ; sinon, demandez un nouveau lien.
+        Il a déjà servi ou il a expiré (un lien est valable 24 heures). Si votre
+        adresse est déjà confirmée, connectez-vous simplement ; sinon, demandez
+        un nouveau lien.
       </p>
       <Link
         href={signedIn ? "/verify-email" : "/login?next=/verify-email"}

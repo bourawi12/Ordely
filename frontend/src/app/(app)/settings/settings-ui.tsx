@@ -12,7 +12,13 @@ export function useSaveStatus(state: SettingsActionState) {
   return [status, () => setDismissed(state)] as const;
 }
 
-export function CardHead({ title, children }: { title: string; children?: ReactNode }) {
+export function CardHead({
+  title,
+  children,
+}: {
+  title: string;
+  children?: ReactNode;
+}) {
   return (
     <div className={styles.cardHead}>
       <h3>{title}</h3>
@@ -31,11 +37,21 @@ export function CardFooter({
   hint?: ReactNode;
   children?: ReactNode;
 }) {
-  const tone = status?.error ? "error" : status?.success ? "success" : undefined;
+  const tone = status?.error
+    ? "error"
+    : status?.success
+      ? "success"
+      : undefined;
   return (
     <div className={styles.cardFoot}>
-      <p className={styles.status} data-tone={tone} role={tone === "error" ? "alert" : "status"}>
-        {tone && <Icon name={tone === "error" ? "xCircle" : "check"} size={17} />}
+      <p
+        className={styles.status}
+        data-tone={tone}
+        role={tone === "error" ? "alert" : "status"}
+      >
+        {tone && (
+          <Icon name={tone === "error" ? "xCircle" : "check"} size={17} />
+        )}
         <span>{status?.error ?? status?.success ?? hint}</span>
       </p>
       {children && <div className={styles.footActions}>{children}</div>}

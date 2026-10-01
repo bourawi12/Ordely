@@ -1,0 +1,438 @@
+/* Analytics. Outcome colours are fixed (not the user's accent) and were checked for colour-blind
+   separation in both themes; every chart also carries a legend, labels or a tooltip. */
+.page {
+  --series-confirmed: light-dark(#2f6bff, #5b8cff);
+  --series-cancelled: light-dark(#e8590c, #dd6b20);
+  --series-pending: light-dark(#0ea5a4, #0fa89a);
+
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/* ---------- Period filter ---------- */
+.ranges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.range {
+  padding: 0.5rem 1.05rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.range:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.range[aria-current="page"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* ---------- KPI tiles ---------- */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.kpi {
+  padding: 1.35rem 1.5rem;
+}
+
+.kpiLabel {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kpiValue {
+  margin: 0.55rem 0 0.6rem;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: 1.85rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.change {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.up {
+  color: var(--positive);
+}
+
+.down {
+  color: var(--negative);
+}
+
+.flat {
+  color: var(--muted);
+}
+
+.kpiHint {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* ---------- Cards ---------- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.wide {
+  grid-column: span 2;
+}
+
+.cardHead {
+  margin-bottom: 1.25rem;
+}
+
+.insight {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.note {
+  margin: 0.9rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* ---------- Outcome colours ---------- */
+.confirmed {
+  background: var(--series-confirmed);
+}
+
+.cancelled {
+  background: var(--series-cancelled);
+}
+
+.pending {
+  background: var(--series-pending);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.legend li,
+.facts dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* ---------- Hover tooltips (CSS only: the page is server-rendered) ---------- */
+.dayCol,
+.hourCol {
+  position: relative;
+}
+
+.dayCol:hover::after,
+.hourCol:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 2;
+  width: max-content;
+  max-width: 220px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgb(10 20 40 / 0.12);
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* ---------- Orders per day: stacked columns ---------- */
+.daily,
+.axis {
+  display: grid;
+  grid-template-columns: repeat(var(--days), minmax(0, 1fr));
+  gap: 2px;
+}
+
+.daily {
+  align-items: end;
+  height: 200px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dayCol {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+
+.dayCol:hover .stack {
+  opacity: 0.8;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1px;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 4px 4px 0 0;
+}
+
+.stack > span {
+  min-height: 2px;
+}
+
+.axis {
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.axis span {
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.axis span:last-child {
+  direction: rtl;
+}
+
+/* ---------- Order outcomes: one split bar ---------- */
+.split {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0;
+}
+
+.facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.facts small,
+.barValue small {
+  margin-left: 0.4rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+/* ---------- Horizontal bars ---------- */
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.barLabel {
+  color: var(--muted);
+}
+
+.barTrack {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.barValue {
+  min-width: 6.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ---------- Answer rate by hour ---------- */
+.hours {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  gap: 6px;
+}
+
+.hourCol {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.hourValue {
+  min-height: 1rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.hourTrack {
+  position: relative;
+  height: 150px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--track);
+}
+
+.hourBar {
+  position: absolute;
+  inset: auto 0 0;
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.hourCol:hover .hourBar,
+.hourBar.best {
+  background: var(--accent);
+}
+
+.hourBar.sparse {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.hourLabel {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* ---------- Tables ---------- */
+.table th:first-child,
+.table td:first-child {
+  padding-left: 0;
+}
+
+.num {
+  text-align: right;
+}
+
+.table td {
+  white-space: nowrap;
+}
+
+.inlineBar {
+  display: inline-block;
+  width: 48px;
+  height: 6px;
+  margin-right: 0.6rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track);
+  vertical-align: middle;
+}
+
+.inlineBar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.alert {
+  color: var(--fail-text);
+  font-weight: 600;
+}
+
+/* ---------- Smaller screens ---------- */
+@media (max-width: 1200px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wide {
+    grid-column: auto;
+  }
+
+  .hourValue {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

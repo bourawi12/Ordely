@@ -6,7 +6,10 @@ import { resendVerification, type ResendState } from "./actions";
 import verify from "./verify-email.module.css";
 
 export function ResendForm() {
-  const [state, action, pending] = useActionState<ResendState, FormData>(resendVerification, {});
+  const [state, action, pending] = useActionState<ResendState, FormData>(
+    resendVerification,
+    {},
+  );
 
   return (
     <form action={action} className={verify.resend}>
@@ -23,7 +26,9 @@ export function ResendForm() {
       <button type="submit" disabled={pending} className={styles.submit}>
         {pending ? "Envoi…" : "Renvoyer l'e-mail"}
       </button>
-      <p className={verify.hint}>Rien reçu ? Pensez à regarder dans vos spams.</p>
+      <p className={verify.hint}>
+        Rien reçu ? Pensez à regarder dans vos spams.
+      </p>
     </form>
   );
 }

@@ -7,7 +7,7 @@ describe('OrdersService', () => {
   let service: OrdersService;
   const order = {
     findMany: jest.fn(),
-    findUnique: jest.fn(),
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     deleteMany: jest.fn(),
@@ -25,13 +25,16 @@ describe('OrdersService', () => {
     service = moduleRef.get(OrdersService);
   });
 
-  it('lists orders newest first', async () => {
+  it("lists only the shop's orders, newest first", async () => {
     order.findMany.mockResolvedValue([]);
-    await service.findAll();
-    expect(order.findMany).toHaveBeenCalledWith({ orderBy: { id: 'desc' } });
+    await service.findAll(7);
+    expect(order.findMany).toHaveBeenCalledWith({
+      where: { boutiqueId: 7 },
+      orderBy: { id: 'desc' },
+    });
   });
 
-  it('creates an order', async () => {
+  it('creates an order in the shop', async () => {
     const dto = {
       customer: 'Ada',
       phone: '+216 22 000 000',
@@ -40,28 +43,42 @@ describe('OrdersService', () => {
       total: 12.5,
     };
     order.create.mockResolvedValue({ id: 1, status: 'pending', ...dto });
-    await expect(service.create(dto)).resolves.toMatchObject({ id: 1 });
-    expect(order.create).toHaveBeenCalledWith({ data: dto });
-  });
-
-  it('updates the status of an existing order', async () => {
-    order.count.mockResolvedValue(1);
-    order.update.mockResolvedValue({ id: 1, status: 'confirmed' });
-    await expect(
-      service.update(1, { status: 'confirmed' }),
-    ).resolves.toMatchObject({
-      status: 'confirmed',
+    await expect(service.create(7, dto)).resolves.toMatchObject({ id: 1 });
+    expect(order.create).toHaveBeenCalledWith({
+      data: { ...dto, boutiqueId: 7 },
     });
   });
 
-  it('throws NotFound for missing orders', async () => {
-    order.findUnique.mockResolvedValue(null);
+  it('edits the fields of an order of the shop', async () => {
+    order.count.mockResolvedValue(1);
+    order.update.mockResolvedValue({ id: 1, customer: 'Bob' });
+    await expect(
+      service.update(7, 1, { customer: 'Bob', quantity: 3 }),
+    ).resolves.toMatchObject({ customer: 'Bob' });
+    expect(order.count).toHaveBeenCalledWith({
+      where: { id: 1, boutiqueId: 7 },
+    });
+    expect(order.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { customer: 'Bob', quantity: 3 },
+    });
+  });
+
+  it("throws NotFound for missing orders and another shop's orders", async () => {
+    order.findFirst.mockResolvedValue(null);
     order.count.mockResolvedValue(0);
     order.deleteMany.mockResolvedValue({ count: 0 });
-    await expect(service.findOne(99)).rejects.toThrow(NotFoundException);
-    await expect(service.update(99, { status: 'confirmed' })).rejects.toThrow(
-      NotFoundException,
+    await expect(service.findOne(7, 99)).rejects.toThrow(NotFoundException);
+    await expect(
+      service.update(7, 99, { status: 'confirmed' }),
+    ).rejects.toThrow(NotFoundException);
+    await expect(service.remove(7, 99)).rejects.toThrow(NotFoundException);
+    expect(order.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 99, boutiqueId: 7 } }),
     );
-    await expect(service.remove(99)).rejects.toThrow(NotFoundException);
+    expect(order.deleteMany).toHaveBeenCalledWith({
+      where: { id: 99, boutiqueId: 7 },
+    });
+    expect(order.update).not.toHaveBeenCalled();
   });
 });

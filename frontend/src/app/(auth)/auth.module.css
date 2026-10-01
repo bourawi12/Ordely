@@ -12,7 +12,11 @@
   place-items: center;
   padding: 2rem 1rem;
   background:
-    radial-gradient(circle at 85% 10%, rgba(30, 99, 255, 0.18), transparent 45%),
+    radial-gradient(
+      circle at 85% 10%,
+      rgba(30, 99, 255, 0.18),
+      transparent 45%
+    ),
     radial-gradient(circle at 10% 90%, rgba(30, 99, 255, 0.1), transparent 45%),
     #f5f7fb;
   color: var(--navy);
@@ -98,6 +102,15 @@
   outline: none;
   border-color: var(--blue);
   box-shadow: 0 0 0 4px rgba(30, 99, 255, 0.15);
+}
+
+/* "Forgot password?", right under the password field. */
+.forgot {
+  align-self: flex-end;
+  margin-top: -0.5rem;
+  color: var(--blue);
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
 /* Sits right under the password field it describes. */
