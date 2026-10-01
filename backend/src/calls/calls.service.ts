@@ -17,6 +17,7 @@ const withOrder = {
   order: { select: { id: true, customer: true, phone: true, total: true } },
 } satisfies Prisma.CallInclude;
 
+/** Calls belong to a shop through their order: every query is scoped by `order.boutiqueId`. */
 @Injectable()
 export class CallsService {
   constructor(
@@ -28,8 +29,8 @@ export class CallsService {
     return this.config.get<string>('APP_TIMEZONE', DEFAULT_TIMEZONE);
   }
 
-  async list(query: ListCallsDto) {
-    const base = await this.baseWhere(query);
+  async list(boutiqueId: number, query: ListCallsDto) {
+    const base = await this.baseWhere(boutiqueId, query);
     const where: Prisma.CallWhereInput = query.status
       ? { ...base, status: query.status }
       : base;
@@ -66,8 +67,11 @@ export class CallsService {
     };
   }
 
-  async exportCsv(filters: CallFiltersDto): Promise<string> {
-    const base = await this.baseWhere(filters);
+  async exportCsv(
+    boutiqueId: number,
+    filters: CallFiltersDto,
+  ): Promise<string> {
+    const base = await this.baseWhere(boutiqueId, filters);
     const where = filters.status ? { ...base, status: filters.status } : base;
     const calls = await this.prisma.call.findMany({
       where,
@@ -103,9 +107,9 @@ export class CallsService {
     return [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\n');
   }
 
-  async findOne(id: number) {
-    const call = await this.prisma.call.findUnique({
-      where: { id },
+  async findOne(boutiqueId: number, id: number) {
+    const call = await this.prisma.call.findFirst({
+      where: { id, order: { boutiqueId } },
       include: withOrder,
     });
     if (!call) {
@@ -118,9 +122,9 @@ export class CallsService {
   }
 
   /** Queues a confirmation call for a pending order. */
-  async queue(orderId: number) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
+  async queue(boutiqueId: number, orderId: number) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, boutiqueId },
       include: { calls: { select: { status: true } } },
     });
     if (!order) {
@@ -143,9 +147,13 @@ export class CallsService {
   }
 
   /** Queues a call for every pending order that doesn't already have one queued. */
-  async queueAllPending() {
+  async queueAllPending(boutiqueId: number) {
     const orders = await this.prisma.order.findMany({
-      where: { status: 'pending', calls: { none: { status: 'pending' } } },
+      where: {
+        boutiqueId,
+        status: 'pending',
+        calls: { none: { status: 'pending' } },
+      },
       select: { id: true, _count: { select: { calls: true } } },
     });
     await this.prisma.call.createMany({
@@ -154,10 +162,10 @@ export class CallsService {
     return { queued: orders.length };
   }
 
-  async usage() {
+  async usage(boutiqueId: number) {
     const since = await startOf(this.prisma, 'month', this.timezone);
     const used = await this.prisma.call.count({
-      where: { createdAt: { gte: since } },
+      where: { createdAt: { gte: since }, order: { boutiqueId } },
     });
     return {
       plan: this.config.get<string>('PLAN_NAME', 'Free plan'),
@@ -169,15 +177,17 @@ export class CallsService {
   }
 
   private async baseWhere(
+    boutiqueId: number,
     filters: CallFiltersDto,
   ): Promise<Prisma.CallWhereInput> {
-    const where: Prisma.CallWhereInput = {};
+    const where: Prisma.CallWhereInput = {
+      order: filters.search
+        ? { boutiqueId, ...searchOrders(filters.search) }
+        : { boutiqueId },
+    };
     const since = await this.rangeStart(filters.range);
     if (since) {
       where.createdAt = { gte: since };
-    }
-    if (filters.search) {
-      where.order = searchOrders(filters.search);
     }
     return where;
   }

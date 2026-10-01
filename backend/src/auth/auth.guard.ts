@@ -13,7 +13,7 @@ import {
   ALLOW_UNVERIFIED_KEY,
   EMAIL_NOT_VERIFIED,
 } from './allow-unverified.decorator';
-import { JwtPayload } from './jwt-payload';
+import { AuthUser, JwtPayload } from './jwt-payload';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
 /**
@@ -36,7 +36,7 @@ export class AuthGuard implements CanActivate {
 
     const request = context
       .switchToHttp()
-      .getRequest<Request & { user?: JwtPayload }>();
+      .getRequest<Request & { user?: AuthUser }>();
     const [type, token] = request.headers.authorization?.split(' ') ?? [];
     if (type !== 'Bearer' || !token) {
       throw new UnauthorizedException();
@@ -52,7 +52,7 @@ export class AuthGuard implements CanActivate {
     // Read from the database, not the token: verifying must take effect without a new login.
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { emailVerifiedAt: true },
+      select: { emailVerifiedAt: true, boutiqueId: true },
     });
     if (!user) {
       throw new UnauthorizedException();
@@ -64,7 +64,7 @@ export class AuthGuard implements CanActivate {
       throw new ForbiddenException(EMAIL_NOT_VERIFIED);
     }
 
-    request.user = payload;
+    request.user = { ...payload, boutiqueId: user.boutiqueId };
     return true;
   }
 }
