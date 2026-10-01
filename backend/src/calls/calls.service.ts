@@ -9,6 +9,7 @@ import { DAY_MS, DEFAULT_TIMEZONE, startOf } from '../common/time';
 import { PrismaService } from '../prisma/prisma.service';
 import { CALL_STATUSES, CallRange, CallStatus } from './call-status';
 import { CallFiltersDto, ListCallsDto } from './dto/list-calls.dto';
+import { UpdateCallDto } from './dto/update-call.dto';
 
 const EXPORT_LIMIT = 10_000;
 const DEFAULT_PLAN_CALL_LIMIT = 500;
@@ -119,6 +120,26 @@ export class CallsService {
       where: { orderId: call.orderId },
     });
     return { ...call, attempts };
+  }
+
+  /** Records the outcome of a call (status, duration, transcript, …). */
+  async update(id: number, dto: UpdateCallDto) {
+    await this.findOne(id); // 404 guard
+    return this.prisma.call.update({
+      where: { id },
+      data: {
+        status: dto.status,
+        ...(dto.durationSeconds !== undefined && {
+          durationSeconds: dto.durationSeconds,
+        }),
+        ...(dto.language !== undefined && { language: dto.language }),
+        ...(dto.transcript !== undefined && {
+          transcript: dto.transcript as unknown as Prisma.InputJsonValue,
+        }),
+        ...(dto.recordingUrl !== undefined && { recordingUrl: dto.recordingUrl }),
+      },
+      include: withOrder,
+    });
   }
 
   /** Queues a confirmation call for a pending order. */
