@@ -52,9 +52,18 @@ export class AuthGuard implements CanActivate {
     // Read from the database, not the token: verifying must take effect without a new login.
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { emailVerifiedAt: true, boutiqueId: true },
+      select: {
+        emailVerifiedAt: true,
+        boutiqueId: true,
+        passwordChangedAt: true,
+      },
     });
-    if (!user) {
+    // A password reset ends every session opened before it.
+    if (
+      !user ||
+      (user.passwordChangedAt &&
+        (payload.iat ?? 0) * 1000 < user.passwordChangedAt.getTime())
+    ) {
       throw new UnauthorizedException();
     }
     if (

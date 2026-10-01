@@ -42,7 +42,11 @@ function ShopCard({
 }) {
   const [status, dismiss] = useSaveStatus(state);
   return (
-    <form action={action} onChange={dismiss} className={`${ui.card} ${styles.card}`}>
+    <form
+      action={action}
+      onChange={dismiss}
+      className={`${ui.card} ${styles.card}`}
+    >
       <div className={styles.cardBody}>
         <CardHead title={title}>{description}</CardHead>
         <div className={styles.fields}>{children}</div>
@@ -72,7 +76,12 @@ function Select({
   return (
     <label className={ui.field}>
       {label}
-      <select name={name} defaultValue={defaultValue ?? ""} required={required} className={ui.input}>
+      <select
+        name={name}
+        defaultValue={defaultValue ?? ""}
+        required={required}
+        className={ui.input}
+      >
         <option value="">{required ? "Choose…" : "Not set"}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -84,7 +93,11 @@ function Select({
   );
 }
 
-function pick<T>(values: ShopActionState["values"], key: string, fallback: T): T {
+function pick<T>(
+  values: ShopActionState["values"],
+  key: string,
+  fallback: T,
+): T {
   return (values?.[key] as T | undefined) ?? fallback;
 }
 
@@ -171,7 +184,11 @@ export function ShopAgentForm({ boutique }: { boutique: Boutique }) {
         <input
           name="callStartTime"
           type="time"
-          defaultValue={pick(v, "callStartTime", boutique.callStartTime ?? "09:00")}
+          defaultValue={pick(
+            v,
+            "callStartTime",
+            boutique.callStartTime ?? "09:00",
+          )}
           required
           className={ui.input}
         />
@@ -190,7 +207,11 @@ export function ShopAgentForm({ boutique }: { boutique: Boutique }) {
         name="confirmationProcess"
         label="Current confirmation process"
         options={CONFIRMATION_PROCESSES}
-        defaultValue={pick(v, "confirmationProcess", boutique.confirmationProcess)}
+        defaultValue={pick(
+          v,
+          "confirmationProcess",
+          boutique.confirmationProcess,
+        )}
       />
     </ShopCard>
   );

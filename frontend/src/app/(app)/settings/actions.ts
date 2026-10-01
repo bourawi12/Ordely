@@ -47,7 +47,10 @@ export async function updateAppearance(
   // An empty colour means the Ordely blue.
   const accent = String(formData.get("accentColor") ?? "");
   const theme = String(formData.get("themeMode") ?? "");
-  if ((accent && !HEX_COLOR.test(accent)) || !THEME_MODES.includes(theme as ThemeMode)) {
+  if (
+    (accent && !HEX_COLOR.test(accent)) ||
+    !THEME_MODES.includes(theme as ThemeMode)
+  ) {
     return { error: "Pick a theme and a valid colour." };
   }
 
@@ -95,6 +98,23 @@ export async function changePassword(
   }
 }
 
+/** Emails the signed-in user a link to choose a new password (when the current one is lost). */
+export async function sendResetLink(): Promise<SettingsActionState> {
+  try {
+    const { email } = await api.me();
+    await api.forgotPassword(email);
+    return { success: `Link sent to ${email}. It works for 1 hour.` };
+  } catch (err) {
+    unstable_rethrow(err);
+    return {
+      error: errorMessage(
+        err,
+        "Could not send the email. Try again in a few minutes.",
+      ),
+    };
+  }
+}
+
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
@@ -106,7 +126,9 @@ export async function saveAvatar(
   _prev: SettingsActionState,
   formData: FormData,
 ): Promise<SettingsActionState> {
-  return formData.get("intent") === "remove" ? removeAvatar() : uploadAvatar(formData);
+  return formData.get("intent") === "remove"
+    ? removeAvatar()
+    : uploadAvatar(formData);
 }
 
 async function uploadAvatar(formData: FormData): Promise<SettingsActionState> {
@@ -173,7 +195,10 @@ function optional(formData: FormData, key: string): string | undefined {
   return text(formData, key) || undefined;
 }
 
-export async function updateShopIdentity(_prev: ShopActionState, formData: FormData) {
+export async function updateShopIdentity(
+  _prev: ShopActionState,
+  formData: FormData,
+) {
   return saveShop(
     "identity",
     {
@@ -185,7 +210,10 @@ export async function updateShopIdentity(_prev: ShopActionState, formData: FormD
   );
 }
 
-export async function updateShopAgent(_prev: ShopActionState, formData: FormData) {
+export async function updateShopAgent(
+  _prev: ShopActionState,
+  formData: FormData,
+) {
   return saveShop(
     "agent",
     {
@@ -198,7 +226,10 @@ export async function updateShopAgent(_prev: ShopActionState, formData: FormData
   );
 }
 
-export async function updateShopDetails(_prev: ShopActionState, formData: FormData) {
+export async function updateShopDetails(
+  _prev: ShopActionState,
+  formData: FormData,
+) {
   return saveShop(
     "details",
     {

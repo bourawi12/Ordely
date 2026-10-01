@@ -252,6 +252,18 @@ export const api = {
     ),
   me: () => request<User>("/auth/me"),
   /** Public: the emailed link may be opened without a session. */
+  forgotPassword: (email: string) =>
+    request<{ sent: true }>(
+      "/auth/forgot-password",
+      { method: "POST", body: JSON.stringify({ email }) },
+      { auth: false },
+    ),
+  resetPassword: (data: { token: string; password: string }) =>
+    request<AuthResult>(
+      "/auth/reset-password",
+      { method: "POST", body: JSON.stringify(data) },
+      { auth: false },
+    ),
   verifyEmail: (token: string) =>
     request<{ email: string }>(
       "/auth/verify-email",

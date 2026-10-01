@@ -19,10 +19,10 @@ export function AppearanceForm({
   const savedAccent = accentColor ?? DEFAULT_ACCENT;
   const [accent, setAccent] = useState(savedAccent);
   const [theme, setTheme] = useState<ThemeMode>(themeMode);
-  const [state, action, pending] = useActionState<SettingsActionState, FormData>(
-    updateAppearance,
-    {},
-  );
+  const [state, action, pending] = useActionState<
+    SettingsActionState,
+    FormData
+  >(updateAppearance, {});
   const [status, dismiss] = useSaveStatus(state);
   const changed = accent !== savedAccent || theme !== themeMode;
   const isDefault = accent === DEFAULT_ACCENT && theme === "system";
@@ -41,7 +41,11 @@ export function AppearanceForm({
       // Everything in the card (swatch rings, thumbnails, buttons) shows the colour being picked.
       style={accentStyle(accent)}
     >
-      <input type="hidden" name="accentColor" value={accent === DEFAULT_ACCENT ? "" : accent} />
+      <input
+        type="hidden"
+        name="accentColor"
+        value={accent === DEFAULT_ACCENT ? "" : accent}
+      />
       <input type="hidden" name="themeMode" value={theme} />
 
       <div className={styles.cardBody}>
@@ -58,7 +62,10 @@ export function AppearanceForm({
         <fieldset className={styles.group}>
           <legend>
             Accent colour
-            <small>Used for buttons, links and highlights. Adjusted if needed so text stays readable.</small>
+            <small>
+              Used for buttons, links and highlights. Adjusted if needed so text
+              stays readable.
+            </small>
           </legend>
           <AccentPicker value={accent} onChange={setAccent} />
           <div className={styles.preview} aria-hidden="true">
@@ -70,7 +77,10 @@ export function AppearanceForm({
         </fieldset>
       </div>
 
-      <CardFooter status={status} hint="Saved to your account, so it follows you on every device.">
+      <CardFooter
+        status={status}
+        hint="Saved to your account, so it follows you on every device."
+      >
         {!isDefault && (
           <button
             type="button"
