@@ -12,6 +12,7 @@ describe('OrdersService', () => {
     update: jest.fn(),
     deleteMany: jest.fn(),
     count: jest.fn(),
+    createMany: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -81,4 +82,33 @@ describe('OrdersService', () => {
     });
     expect(order.update).not.toHaveBeenCalled();
   });
+
+  it('imports valid CSV rows and reports invalid ones', async () => {
+    order.createMany.mockResolvedValue({ count: 1 });
+    const csvContent =
+      'customer,phone,item,quantity,total,status\n' +
+      'John Doe,+216 22 111 222,Robe Silk,2,120.5,pending\n' +
+      'Bad Row,invalid-phone,Robe,0,-5,unknown\n';
+    const fileBuffer = Buffer.from(csvContent, 'utf-8');
+
+    const result = await service.importCsv(7, fileBuffer);
+
+    expect(result.imported).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].row).toBe(3);
+    expect(order.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          boutiqueId: 7,
+          customer: 'John Doe',
+          phone: '+216 22 111 222',
+          item: 'Robe Silk',
+          quantity: 2,
+          total: 120.5,
+        },
+      ],
+    });
+  });
 });
+

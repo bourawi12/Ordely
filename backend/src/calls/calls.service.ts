@@ -123,24 +123,33 @@ export class CallsService {
   }
 
   /** Records the outcome of a call (status, duration, transcript, …). */
-  async update(id: number, dto: UpdateCallDto) {
-    await this.findOne(id); // 404 guard
-    return this.prisma.call.update({
-      where: { id },
-      data: {
-        status: dto.status,
-        ...(dto.durationSeconds !== undefined && {
-          durationSeconds: dto.durationSeconds,
-        }),
-        ...(dto.language !== undefined && { language: dto.language }),
-        ...(dto.transcript !== undefined && {
-          transcript: dto.transcript as unknown as Prisma.InputJsonValue,
-        }),
-        ...(dto.recordingUrl !== undefined && { recordingUrl: dto.recordingUrl }),
-      },
-      include: withOrder,
-    });
-  }
+async update(
+  boutiqueId: number,
+  id: number,
+  dto: UpdateCallDto,
+) {
+  await this.findOne(boutiqueId, id);
+
+  return this.prisma.call.update({
+    where: { id },
+    data: {
+      status: dto.status,
+      ...(dto.durationSeconds !== undefined && {
+        durationSeconds: dto.durationSeconds,
+      }),
+      ...(dto.language !== undefined && {
+        language: dto.language,
+      }),
+      ...(dto.transcript !== undefined && {
+        transcript: dto.transcript as unknown as Prisma.InputJsonValue,
+      }),
+      ...(dto.recordingUrl !== undefined && {
+        recordingUrl: dto.recordingUrl,
+      }),
+    },
+    include: withOrder,
+  });
+}
 
   /** Queues a confirmation call for a pending order. */
   async queue(boutiqueId: number, orderId: number) {

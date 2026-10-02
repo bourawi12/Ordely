@@ -71,3 +71,39 @@ export async function deleteOrder(id: number) {
   revalidatePath("/orders");
   redirect("/orders");
 }
+
+export interface ImportState {
+  error?: string;
+  imported?: number;
+  failed?: number;
+  errors?: { row: number; message: string }[];
+}
+
+export async function importOrders(
+  _prev: ImportState,
+  formData: FormData,
+): Promise<ImportState> {
+  const file = formData.get("file");
+  if (!file || !(file instanceof File) || file.size === 0) {
+    return { error: "Please select a CSV file." };
+  }
+
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const result = await api.importOrders(form);
+    revalidatePath("/orders");
+    revalidatePath("/dashboard");
+    return {
+      imported: result.imported,
+      failed: result.failed,
+      errors: result.errors,
+    };
+  } catch (err) {
+    unstable_rethrow(err);
+    return {
+      error: err instanceof ApiError ? err.message : "Backend unreachable",
+    };
+  }
+}
+

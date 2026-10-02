@@ -81,9 +81,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-  padding: 1.1rem 1.5rem;
-  border-bottom: 1px solid var(--border);
+  padding: 1.1rem 0 1.1rem 1.5rem;
 }
+
+
 
 .tab {
   padding: 0.4rem 0.95rem;
@@ -121,3 +122,173 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- CSV Import Modal ---------- */
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  padding-right: 1rem;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+}
+
+.importModal {
+  width: min(520px, 92vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+.modalHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.closeBtn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.closeBtn:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.importHint {
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.importAliases {
+  font-size: 0.82rem;
+  opacity: 0.8;
+}
+
+.dropZone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 2rem;
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dropZone:hover,
+.dragOver {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dropIcon {
+  color: var(--muted);
+}
+
+.dropText {
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.fileName {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--accent);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.importAlert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.importAlert[data-type="success"] {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.importAlert[data-type="error"] {
+  background: var(--fail-bg);
+  color: var(--fail-text);
+}
+
+.importResult {
+  margin-top: 0.25rem;
+}
+
+.errorDetails {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.errorDetails summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.errorList {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--fail-text);
+  list-style: disc;
+}
+
+.errorList li {
+  margin-bottom: 0.3rem;
+  line-height: 1.4;
+}
+
