@@ -230,6 +230,12 @@ function query(params: Record<string, string | number | undefined>): string {
   return s ? `?${s}` : "";
 }
 
+export interface ImportResult {
+  imported: number;
+  failed: number;
+  errors: { row: number; message: string }[];
+}
+
 export const api = {
   health: () => request<Health>("/health", undefined, { auth: false }),
   login: (data: { email: string; password: string }) =>
@@ -326,6 +332,9 @@ completeOnboarding: () =>
     request<Call>("/calls", { method: "POST", body: JSON.stringify({ orderId }) }),
   queueAllPending: () =>
     request<{ queued: number }>("/calls/queue-pending", { method: "POST" }),
+  /** Upload a CSV file to bulk-import orders. */
+  importOrders: (form: FormData) =>
+    request<ImportResult>("/orders/import", { method: "POST", body: form }),
   listOrders: (status?: OrderStatus) =>
     request<Order[]>(`/orders${status ? `?status=${status}` : ""}`),
   getOrder: (id: number) =>
@@ -347,3 +356,4 @@ completeOnboarding: () =>
   deleteOrder: (id: number) =>
     request<void>(`/orders/${id}`, { method: "DELETE" }),
 };
+

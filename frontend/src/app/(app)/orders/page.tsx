@@ -1,4 +1,5 @@
 import Link from "next/link";
+import CsvImportForm from "@/components/CsvImportForm";
 import NewOrderForm from "@/components/NewOrderForm";
 import StatusBadge from "@/components/StatusBadge";
 import ui from "@/components/app/ui.module.css";
@@ -27,21 +28,26 @@ export default async function OrdersPage({
   return (
     <div className={styles.layout}>
       <section className={`${ui.card} ${styles.tableCard}`}>
-        <nav className={styles.tabs} aria-label="Filter by status">
-          {FILTERS.map((f) => (
-            <Link
-              key={f.label}
-              href={f.value ? `/orders?status=${f.value}` : "/orders"}
-              className={styles.tab}
-              aria-current={f.value === status ? "page" : undefined}
-            >
-              {f.label}
-            </Link>
-          ))}
-        </nav>
+        <div className={styles.headerRow}>
+          <nav className={styles.tabs} aria-label="Filter by status">
+            {FILTERS.map((f) => (
+              <Link
+                key={f.label}
+                href={f.value ? `/orders?status=${f.value}` : "/orders"}
+                className={styles.tab}
+                aria-current={f.value === status ? "page" : undefined}
+              >
+                {f.label}
+              </Link>
+            ))}
+          </nav>
+          <div className={styles.headerActions}>
+            <CsvImportForm />
+          </div>
+        </div>
         {orders.length === 0 ? (
           <p className={ui.empty}>
-            {status ? `No ${status} orders.` : "No orders yet. Create one to get started."}
+            {status ? `No ${status} orders.` : "No orders yet. Create one or import a CSV to get started."}
           </p>
         ) : (
           <div className={ui.tableWrap}>
@@ -85,3 +91,4 @@ export default async function OrdersPage({
     </div>
   );
 }
+
