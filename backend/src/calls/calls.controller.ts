@@ -48,10 +48,11 @@ export class CallsController {
 
   @Patch(':id')
   update(
+    @CurrentBoutique() boutiqueId: number,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCallDto,
   ) {
-    return this.callsService.update(id, dto);
+    return this.callsService.update(boutiqueId,id, dto);
   }
 
   @Post()
