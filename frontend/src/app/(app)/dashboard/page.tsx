@@ -18,14 +18,25 @@ import styles from "./dashboard.module.css";
 
 export const dynamic = "force-dynamic";
 
-function StatCard({ label, value, change }: { label: string; value: string; change: Change }) {
+/** A 30-day metric; the whole card opens the list it counts. */
+function StatCard({
+  label,
+  value,
+  change,
+  href,
+}: {
+  label: string;
+  value: string;
+  change: Change;
+  href: string;
+}) {
   const tone = change.good === null ? styles.flat : change.good ? styles.up : styles.down;
   return (
-    <div className={`${ui.card} ${styles.stat}`}>
+    <Link href={href} className={`${ui.card} ${styles.stat} ${styles.statLink}`}>
       <p className={styles.statLabel}>{label}</p>
       <p className={styles.statValue}>{value}</p>
       <p className={`${styles.change} ${tone}`}>{change.text}</p>
-    </div>
+    </Link>
   );
 }
 
@@ -39,21 +50,25 @@ export default async function DashboardPage() {
       <section className={styles.stats} aria-label="Last 30 days">
         <StatCard
           label="Total orders"
+          href="/orders"
           value={formatNumber(stats.totalOrders.value)}
           change={percentChange(stats.totalOrders.value, stats.totalOrders.previous)}
         />
         <StatCard
           label="Confirmed"
+          href="/orders?status=confirmed"
           value={formatNumber(stats.confirmedOrders.value)}
           change={percentChange(stats.confirmedOrders.value, stats.confirmedOrders.previous)}
         />
         <StatCard
           label="Failed / No answer"
+          href="/call-logs?range=30d&status=failed"
           value={formatNumber(stats.failedCalls.value)}
           change={percentChange(stats.failedCalls.value, stats.failedCalls.previous, true)}
         />
         <StatCard
           label="Avg. call duration"
+          href="/call-logs?range=30d"
           value={formatDuration(stats.avgDuration.value).replace(/^0m /, "")}
           change={secondsChange(stats.avgDuration.value, stats.avgDuration.previous)}
         />
@@ -155,6 +170,11 @@ export default async function DashboardPage() {
               </tbody>
             </table>
           </div>
+        )}
+        {pendingCount > 0 && (
+          <Link href="/orders?status=pending" className={styles.viewAll}>
+            View all pending orders <Icon name="arrow" size={16} />
+          </Link>
         )}
       </section>
     </div>

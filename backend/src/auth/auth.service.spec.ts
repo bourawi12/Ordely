@@ -22,6 +22,7 @@ describe('AuthService', () => {
     findUnique: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
   };
 
   const boutique = { create: jest.fn() };
@@ -203,6 +204,111 @@ describe('AuthService', () => {
         status: 429,
       });
       expect(mail.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('password reset', () => {
+    const sha256 = (value: string) =>
+      createHash('sha256').update(value).digest('hex');
+    const ada = {
+      id: 1,
+      email: 'ada@example.com',
+      name: 'Ada',
+      passwordResetSentAt: null,
+      emailVerifiedAt: null,
+    };
+
+    it('answers the same for an unknown address and sends nothing', async () => {
+      user.findUnique.mockResolvedValue(null);
+      await expect(
+        service.requestPasswordReset('nobody@example.com'),
+      ).resolves.toEqual({ sent: true });
+      expect(mail.send).not.toHaveBeenCalled();
+      expect(user.update).not.toHaveBeenCalled();
+    });
+
+    it('stores only a hash of the token and emails the matching link, once a minute', async () => {
+      user.findUnique.mockResolvedValue(ada);
+      await expect(
+        service.requestPasswordReset('ada@example.com'),
+      ).resolves.toEqual({ sent: true });
+      const stored = user.update.mock.calls[0][0].data;
+      const { to, text } = mail.send.mock.calls[0][0];
+      const token = /reset-password\?token=([\w-]+)/.exec(text)?.[1] ?? '';
+      expect(to).toBe('ada@example.com');
+      expect(token).not.toBe('');
+      expect(stored.passwordResetTokenHash).toBe(sha256(token));
+      expect(stored.passwordResetExpiresAt.getTime()).toBeLessThanOrEqual(
+        Date.now() + 60 * 60 * 1000,
+      );
+
+      // Asked again right away: same answer, no second email.
+      jest.clearAllMocks();
+      user.findUnique.mockResolvedValue({
+        ...ada,
+        passwordResetSentAt: new Date(Date.now() - 10_000),
+      });
+      await expect(
+        service.requestPasswordReset('ada@example.com'),
+      ).resolves.toEqual({ sent: true });
+      expect(mail.send).not.toHaveBeenCalled();
+    });
+
+    it('sets the new password once, ends older sessions and signs the user in', async () => {
+      user.findUnique
+        .mockResolvedValueOnce({
+          ...ada,
+          passwordResetExpiresAt: new Date(Date.now() + 60_000),
+        })
+        .mockResolvedValueOnce({ ...ada, createdAt: new Date() });
+      user.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.resetPassword('the-token', 'N3w!passw0rd');
+
+      expect(user.findUnique.mock.calls[0][0]).toEqual({
+        where: { passwordResetTokenHash: sha256('the-token') },
+      });
+      const { where, data } = user.updateMany.mock.calls[0][0];
+      // The hash is matched again: two clicks at once can't both use the link.
+      expect(where).toEqual({
+        id: 1,
+        passwordResetTokenHash: sha256('the-token'),
+      });
+      expect(await bcrypt.compare('N3w!passw0rd', data.passwordHash)).toBe(
+        true,
+      );
+      expect(data).toMatchObject({
+        passwordResetTokenHash: null,
+        passwordChangedAt: expect.any(Date),
+        emailVerifiedAt: expect.any(Date),
+      });
+      expect(result.accessToken).toEqual(expect.any(String));
+      expect(result.user).not.toHaveProperty('passwordResetTokenHash');
+    });
+
+    it('refuses an expired, unknown or already used link', async () => {
+      user.findUnique.mockResolvedValueOnce({
+        ...ada,
+        passwordResetExpiresAt: new Date(Date.now() - 1),
+      });
+      await expect(
+        service.resetPassword('old-token', 'N3w!passw0rd'),
+      ).rejects.toThrow('This link is invalid or has expired');
+      user.findUnique.mockResolvedValueOnce(null);
+      await expect(
+        service.resetPassword('unknown', 'N3w!passw0rd'),
+      ).rejects.toThrow(BadRequestException);
+      expect(user.updateMany).not.toHaveBeenCalled();
+
+      // Used by a concurrent request between the lookup and the update.
+      user.findUnique.mockResolvedValueOnce({
+        ...ada,
+        passwordResetExpiresAt: new Date(Date.now() + 60_000),
+      });
+      user.updateMany.mockResolvedValueOnce({ count: 0 });
+      await expect(
+        service.resetPassword('raced', 'N3w!passw0rd'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

@@ -9,17 +9,22 @@ datasource db {
 
 /// Order status: "pending" (awaiting confirmation), "confirmed" or "cancelled".
 model Order {
-  id        Int      @id @default(autoincrement())
-  customer  String   @db.VarChar
-  phone     String   @default("") @db.VarChar(30)
-  item      String   @db.VarChar
-  quantity  Int
+  id         Int      @id @default(autoincrement())
+  /// The shop the order belongs to: every read and write is scoped by it.
+  boutiqueId Int
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  customer   String   @db.VarChar
+  phone      String   @default("") @db.VarChar(30)
+  item       String   @db.VarChar
+  quantity   Int
   /// Order value in TND (3 decimals for millimes).
-  total     Decimal  @default(0) @db.Decimal(10, 3)
-  status    String   @default("pending") @db.VarChar(20)
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  calls     Call[]
+  total      Decimal  @default(0) @db.Decimal(10, 3)
+  status     String   @default("pending") @db.VarChar(20)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  calls      Call[]
 
+  @@index([boutiqueId, status])
+  @@index([boutiqueId, createdAt])
   @@index([status])
   @@index([createdAt])
   @@map("orders")
@@ -47,26 +52,33 @@ model Call {
 }
 
 model User {
-  id                   Int       @id @default(autoincrement())
-  email                String    @unique
-  name                 String
-  passwordHash         String
-  boutiqueId           Int
-  boutique             Boutique  @relation(fields: [boutiqueId], references: [id])
+  id                     Int       @id @default(autoincrement())
+  email                  String    @unique
+  name                   String
+  passwordHash           String
+  boutiqueId             Int
+  boutique               Boutique  @relation(fields: [boutiqueId], references: [id])
   /// Object key of the profile picture in the S3 bucket (never a URL: URLs are signed on read).
-  avatarKey            String?   @db.VarChar(255)
+  avatarKey              String?   @db.VarChar(255)
   /// Accent colour of the app, "#RRGGBB"; null = the Ordely blue.
-  accentColor          String?   @db.VarChar(7)
+  accentColor            String?   @db.VarChar(7)
   /// "system" (follow the device), "light" or "dark".
-  themeMode            String    @default("system") @db.VarChar(10)
+  themeMode              String    @default("system") @db.VarChar(10)
   /// Set once the address is confirmed through the emailed link; the app stays closed until then.
-  emailVerifiedAt      DateTime? @db.Timestamptz(6)
+  emailVerifiedAt        DateTime? @db.Timestamptz(6)
   /// SHA-256 of the pending link's token (the token itself is only in the email).
-  emailVerifyTokenHash String?   @unique @db.VarChar(64)
-  emailVerifyExpiresAt DateTime? @db.Timestamptz(6)
+  emailVerifyTokenHash   String?   @unique @db.VarChar(64)
+  emailVerifyExpiresAt   DateTime? @db.Timestamptz(6)
   /// When the last link was sent, for the resend cooldown.
-  emailVerifySentAt    DateTime? @db.Timestamptz(6)
-  createdAt            DateTime  @default(now()) @db.Timestamptz(6)
+  emailVerifySentAt      DateTime? @db.Timestamptz(6)
+  /// SHA-256 of the pending "forgot password" link's token (the token itself is only in the email).
+  passwordResetTokenHash String?   @unique @db.VarChar(64)
+  passwordResetExpiresAt DateTime? @db.Timestamptz(6)
+  /// When the last reset link was sent, for the cooldown.
+  passwordResetSentAt    DateTime? @db.Timestamptz(6)
+  /// Set by a password reset: sessions issued before it stop working.
+  passwordChangedAt      DateTime? @db.Timestamptz(6)
+  createdAt              DateTime  @default(now()) @db.Timestamptz(6)
 
   @@index([boutiqueId])
   @@map("users")
@@ -97,6 +109,7 @@ model Boutique {
   createdAt             DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   users                 User[]
+  orders                Order[]
 
   @@map("boutiques")
 }

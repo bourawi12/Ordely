@@ -4,24 +4,34 @@ import { useActionState, useEffect, useState } from "react";
 import Icon from "@/components/Icon";
 import PasswordRules from "@/components/PasswordRules";
 import ui from "@/components/app/ui.module.css";
-import { changePassword, updateProfile, type SettingsActionState } from "./actions";
+import {
+  changePassword,
+  sendResetLink,
+  updateProfile,
+  type SettingsActionState,
+} from "./actions";
 import { CardFooter, CardHead, useSaveStatus } from "./settings-ui";
 import styles from "./settings.module.css";
 
 export function ProfileForm({ name, email }: { name: string; email: string }) {
-  const [state, action, pending] = useActionState<SettingsActionState, FormData>(
-    updateProfile,
-    {},
-  );
+  const [state, action, pending] = useActionState<
+    SettingsActionState,
+    FormData
+  >(updateProfile, {});
   const [status, dismiss] = useSaveStatus(state);
   const [value, setValue] = useState(name);
   const changed = value.trim() !== "" && value.trim() !== name;
 
   return (
-    <form action={action} onChange={dismiss} className={`${ui.card} ${styles.card}`}>
+    <form
+      action={action}
+      onChange={dismiss}
+      className={`${ui.card} ${styles.card}`}
+    >
       <div className={styles.cardBody}>
         <CardHead title="Personal information">
-          Your name is shown in the header. Your e-mail address is how you sign in.
+          Your name is shown in the header. Your e-mail address is how you sign
+          in.
         </CardHead>
         <div className={styles.fields}>
           <label className={ui.field}>
@@ -55,20 +65,25 @@ export function ProfileForm({ name, email }: { name: string; email: string }) {
 }
 
 export function PasswordForm() {
-  const [state, action, pending] = useActionState<SettingsActionState, FormData>(
-    changePassword,
-    {},
-  );
+  const [state, action, pending] = useActionState<
+    SettingsActionState,
+    FormData
+  >(changePassword, {});
   const [status, dismiss] = useSaveStatus(state);
   // Drives the checklist. React empties the password fields after each submit.
   const [newPassword, setNewPassword] = useState("");
   useEffect(() => setNewPassword(""), [state]);
 
   return (
-    <form action={action} onChange={dismiss} className={`${ui.card} ${styles.card}`}>
+    <form
+      action={action}
+      onChange={dismiss}
+      className={`${ui.card} ${styles.card}`}
+    >
       <div className={styles.cardBody}>
         <CardHead title="Password">
-          Use a password you don&apos;t use anywhere else. You stay signed in after changing it.
+          Use a password you don&apos;t use anywhere else. You stay signed in
+          after changing it.
         </CardHead>
         <div className={styles.fields}>
           <label className={ui.field}>
@@ -112,9 +127,38 @@ export function PasswordForm() {
           </div>
         </div>
       </div>
-      <CardFooter status={status} hint="Your new password must tick every rule above.">
+      <CardFooter
+        status={status}
+        hint="Your new password must tick every rule above."
+      >
         <button type="submit" className={ui.btn} disabled={pending}>
           {pending ? "Updating…" : "Update password"}
+        </button>
+      </CardFooter>
+    </form>
+  );
+}
+
+/** For when the current password is lost: a reset link goes to the account's address. */
+export function ResetLinkForm() {
+  const [state, action, pending] = useActionState<
+    SettingsActionState,
+    FormData
+  >(sendResetLink, {});
+  const [status] = useSaveStatus(state);
+
+  return (
+    <form action={action} className={`${ui.card} ${styles.card}`}>
+      <div className={styles.cardBody}>
+        <CardHead title="Forgot your password?">
+          We&apos;ll email you a link to choose a new one, without your current
+          password. Using it signs you out everywhere else.
+        </CardHead>
+      </div>
+      <CardFooter status={status} hint="The link works for 1 hour, once.">
+        <button type="submit" className={ui.btnGhost} disabled={pending}>
+          <Icon name="mail" size={17} />
+          {pending ? "Sending…" : "Email me a reset link"}
         </button>
       </CardFooter>
     </form>

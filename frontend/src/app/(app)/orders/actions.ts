@@ -6,6 +6,7 @@ import { api, ApiError, type OrderStatus } from "@/lib/api";
 
 export interface FormState {
   error?: string;
+  success?: string;
 }
 
 export async function createOrder(
@@ -30,6 +31,32 @@ export async function createOrder(
   revalidatePath("/orders");
   revalidatePath("/dashboard");
   return {};
+}
+
+/** The edit form on the order page. `id` is bound by the page. */
+export async function editOrder(
+  id: number,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    await api.updateOrder(id, {
+      customer: String(formData.get("customer") ?? ""),
+      phone: String(formData.get("phone") ?? ""),
+      item: String(formData.get("item") ?? ""),
+      quantity: Number(formData.get("quantity")),
+      total: Number(formData.get("total")),
+    });
+  } catch (err) {
+    unstable_rethrow(err);
+    return {
+      error: err instanceof ApiError ? err.message : "Backend unreachable",
+    };
+  }
+  revalidatePath("/orders");
+  revalidatePath("/dashboard");
+  revalidatePath(`/orders/${id}`);
+  return { success: "Order saved." };
 }
 
 export async function setOrderStatus(id: number, status: OrderStatus) {

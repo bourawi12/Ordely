@@ -12,8 +12,17 @@ const MAX_BYTES = 2 * 1024 * 1024;
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 /** Picking a file uploads it right away; the picture itself is also a way to pick one. */
-export function AvatarForm({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
-  const [state, action, pending] = useActionState<SettingsActionState, FormData>(saveAvatar, {});
+export function AvatarForm({
+  name,
+  avatarUrl,
+}: {
+  name: string;
+  avatarUrl: string | null;
+}) {
+  const [state, action, pending] = useActionState<
+    SettingsActionState,
+    FormData
+  >(saveAvatar, {});
   const [status, dismiss] = useSaveStatus(state);
   const [intent, setIntent] = useState<"upload" | "remove">("upload");
   const [preview, setPreview] = useState<string | null>(null);
@@ -53,14 +62,23 @@ export function AvatarForm({ name, avatarUrl }: { name: string; avatarUrl: strin
   const busyText = intent === "remove" ? "Removing…" : "Uploading…";
 
   return (
-    <form ref={formRef} action={action} onChange={dismiss} className={`${ui.card} ${styles.card}`}>
+    <form
+      ref={formRef}
+      action={action}
+      onChange={dismiss}
+      className={`${ui.card} ${styles.card}`}
+    >
       <div className={`${styles.cardBody} ${styles.avatarCard}`}>
         <div className={styles.avatarInfo}>
           <CardHead title="Profile picture">
-            Shown next to your name in the header. Click the picture to change it.
+            Shown next to your name in the header. Click the picture to change
+            it.
           </CardHead>
           <div className={styles.avatarActions}>
-            <label className={`${ui.btnGhost} ${styles.fileBtn}`} data-disabled={pending || undefined}>
+            <label
+              className={`${ui.btnGhost} ${styles.fileBtn}`}
+              data-disabled={pending || undefined}
+            >
               <Icon name="upload" size={17} />
               {avatarUrl ? "Change picture" : "Upload picture"}
               <input
@@ -92,7 +110,11 @@ export function AvatarForm({ name, avatarUrl }: { name: string; avatarUrl: strin
           </div>
         </div>
 
-        <label htmlFor={fileId} className={styles.avatarBig} data-busy={pending || undefined}>
+        <label
+          htmlFor={fileId}
+          className={styles.avatarBig}
+          data-busy={pending || undefined}
+        >
           {shown ? (
             // Signed MinIO URL or local preview blob.
             // eslint-disable-next-line @next/next/no-img-element
@@ -101,7 +123,11 @@ export function AvatarForm({ name, avatarUrl }: { name: string; avatarUrl: strin
             <span aria-hidden="true">{initials(name)}</span>
           )}
           <span className={styles.avatarOverlay} aria-hidden="true">
-            {pending ? <span className={styles.spinner} /> : <Icon name="upload" size={22} />}
+            {pending ? (
+              <span className={styles.spinner} />
+            ) : (
+              <Icon name="upload" size={22} />
+            )}
           </span>
           <span className="sr-only">Change picture</span>
         </label>

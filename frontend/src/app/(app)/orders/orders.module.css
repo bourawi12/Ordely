@@ -61,6 +61,50 @@
   font-weight: 500;
 }
 
+.editBtn {
+  margin-bottom: 1.25rem;
+}
+
+.editForm {
+  margin-bottom: 1.75rem;
+}
+
+.saved {
+  margin: -1rem 0 0.75rem;
+  color: var(--success-text);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* Order status filter above the list. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 1.1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  padding: 0.4rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.tab:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.tab[aria-current="page"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

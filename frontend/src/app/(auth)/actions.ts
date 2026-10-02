@@ -79,7 +79,9 @@ export async function register(
       name,
       password,
       accentColor: HEX_COLOR.test(accent) ? accent : undefined,
-      themeMode: THEME_MODES.includes(theme as ThemeMode) ? (theme as ThemeMode) : undefined,
+      themeMode: THEME_MODES.includes(theme as ThemeMode)
+        ? (theme as ThemeMode)
+        : undefined,
     });
     if (avatar instanceof File && avatar.size > 0) {
       // The account exists either way: a refused picture can be added later in Settings.

@@ -70,11 +70,16 @@ export interface Change {
 }
 
 /** "+12% vs last 30 days"; `lowerIsBetter` flips which direction is green. */
-export function percentChange(value: number, previous: number, lowerIsBetter = false): Change {
+export function percentChange(
+  value: number,
+  previous: number,
+  lowerIsBetter = false,
+  period = "last 30 days",
+): Change {
   if (previous === 0) return { text: value ? "New this period" : "No change", good: null };
   const pct = Math.round(((value - previous) / previous) * 100);
   return {
-    text: `${pct > 0 ? "+" : pct < 0 ? "−" : ""}${Math.abs(pct)}% vs last 30 days`,
+    text: `${pct > 0 ? "+" : pct < 0 ? "−" : ""}${Math.abs(pct)}% vs ${period}`,
     good: pct === 0 ? null : lowerIsBetter ? pct < 0 : pct > 0,
   };
 }
@@ -85,6 +90,21 @@ export function secondsChange(value: number, previous: number): Change {
     text: `${diff > 0 ? "+" : diff < 0 ? "−" : ""}${Math.abs(diff)}s vs last 30 days`,
     good: diff === 0 ? null : diff < 0,
   };
+}
+
+/** "+3.2 pts vs previous 30 days" for two 0–1 rates. */
+export function pointsChange(value: number, previous: number, period: string): Change {
+  const pts = Math.round((value - previous) * 1000) / 10;
+  return {
+    text: `${pts > 0 ? "+" : pts < 0 ? "−" : ""}${Math.abs(pts)} pts vs ${period}`,
+    good: pts === 0 ? null : pts > 0,
+  };
+}
+
+/** A 0–1 rate as "81%" (one decimal under 10%). */
+export function formatPercent(rate: number): string {
+  const pct = rate * 100;
+  return `${pct > 0 && pct < 10 ? pct.toFixed(1) : Math.round(pct)}%`;
 }
 
 export function initials(name: string): string {
