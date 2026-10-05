@@ -44,6 +44,7 @@ export class OrdersService {
   findAll(boutiqueId: number, status?: OrderStatus): Promise<Order[]> {
     return this.prisma.order.findMany({
       where: status ? { boutiqueId, status } : { boutiqueId },
+      include: { items: true },
       orderBy: { id: 'desc' },
     });
   }
@@ -51,7 +52,10 @@ export class OrdersService {
   async findOne(boutiqueId: number, id: number) {
     const order = await this.prisma.order.findFirst({
       where: { id, boutiqueId },
-      include: { calls: { orderBy: { createdAt: 'desc' } } },
+      include: {
+        items: true,
+        calls: { orderBy: { createdAt: 'desc' } },
+      },
     });
     if (!order) {
       throw new NotFoundException(`Order ${id} not found`);
@@ -59,8 +63,30 @@ export class OrdersService {
     return order;
   }
 
-  create(boutiqueId: number, dto: CreateOrderDto): Promise<Order> {
-    return this.prisma.order.create({ data: { ...dto, boutiqueId } });
+  async create(boutiqueId: number, dto: CreateOrderDto): Promise<Order> {
+    const computedTotal =
+      dto.total ??
+      dto.items.reduce(
+        (sum, item) => sum + (item.unitPrice ?? 0) * item.quantity,
+        0,
+      );
+
+    return this.prisma.order.create({
+      data: {
+        customer: dto.customer,
+        phone: dto.phone,
+        total: computedTotal,
+        boutiqueId,
+        items: {
+          create: dto.items.map((i) => ({
+            productName: i.productName,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice ?? 0,
+          })),
+        },
+      },
+      include: { items: true },
+    });
   }
 
   async update(
@@ -69,7 +95,11 @@ export class OrdersService {
     dto: UpdateOrderDto,
   ): Promise<Order> {
     await this.ensureExists(boutiqueId, id);
-    return this.prisma.order.update({ where: { id }, data: dto });
+    return this.prisma.order.update({
+      where: { id },
+      data: dto,
+      include: { items: true },
+    });
   }
 
   private async ensureExists(boutiqueId: number, id: number) {
@@ -113,8 +143,7 @@ export class OrdersService {
     const valid: {
       customer: string;
       phone: string;
-      item: string;
-      quantity: number;
+      items: { productName: string; quantity: number; unitPrice: number }[];
       total: number;
       boutiqueId: number;
     }[] = [];
@@ -134,7 +163,7 @@ export class OrdersService {
 
       const customer = (cells[colMap.customer] ?? '').trim();
       const phone = (cells[colMap.phone] ?? '').trim();
-      const item = (cells[colMap.item] ?? '').trim();
+      const itemRaw = (cells[colMap.item] ?? '').trim();
       const qtyRaw = (cells[colMap.quantity] ?? '').trim();
       const totalRaw = (cells[colMap.total] ?? '').trim();
 
@@ -144,13 +173,46 @@ export class OrdersService {
       if (!phone) rowErrors.push('phone is empty');
       else if (!PHONE_RE.test(phone)) rowErrors.push('invalid phone number');
 
-      if (!item) rowErrors.push('item is empty');
-      else if (item.length > 200) rowErrors.push('item exceeds 200 characters');
+      const itemParts = itemRaw
+        ? itemRaw.split(';').map((s) => s.trim()).filter((s) => s.length > 0)
+        : [];
+      const qtyParts = qtyRaw
+        ? qtyRaw.split(';').map((s) => s.trim()).filter((s) => s.length > 0)
+        : [];
 
-      const quantity = parseInt(qtyRaw, 10);
-      if (!qtyRaw || isNaN(quantity)) rowErrors.push('quantity is not a number');
-      else if (quantity < 1) rowErrors.push('quantity must be at least 1');
-      else if (quantity > 1000) rowErrors.push('quantity exceeds 1000');
+      if (itemParts.length === 0) {
+        rowErrors.push('item is empty');
+      } else {
+        for (const p of itemParts) {
+          if (p.length > 200) {
+            rowErrors.push('item exceeds 200 characters');
+            break;
+          }
+        }
+      }
+
+      const parsedItems: { productName: string; quantity: number }[] = [];
+      if (itemParts.length > 0) {
+        if (qtyParts.length === 0) {
+          rowErrors.push('quantity is not a number');
+        } else {
+          for (let j = 0; j < itemParts.length; j++) {
+            const rawQ = qtyParts[j] ?? qtyParts[0];
+            const q = parseInt(rawQ, 10);
+            if (isNaN(q)) {
+              rowErrors.push('quantity is not a number');
+              break;
+            } else if (q < 1) {
+              rowErrors.push('quantity must be at least 1');
+              break;
+            } else if (q > 1000) {
+              rowErrors.push('quantity exceeds 1000');
+              break;
+            }
+            parsedItems.push({ productName: itemParts[j], quantity: q });
+          }
+        }
+      }
 
       const total = parseFloat(totalRaw);
       if (!totalRaw || isNaN(total)) rowErrors.push('total is not a number');
@@ -160,13 +222,39 @@ export class OrdersService {
       if (rowErrors.length > 0) {
         errors.push({ row: rowNum, message: rowErrors.join('; ') });
       } else {
-        valid.push({ customer, phone, item, quantity, total, boutiqueId });
+        const totalQty = parsedItems.reduce((sum, item) => sum + item.quantity, 0);
+        const unitPrice = totalQty > 0 ? total / totalQty : total;
+        valid.push({
+          customer,
+          phone,
+          items: parsedItems.map((pi) => ({
+            productName: pi.productName,
+            quantity: pi.quantity,
+            unitPrice,
+          })),
+          total,
+          boutiqueId,
+        });
       }
     }
 
     // --- Bulk insert valid rows ---
     if (valid.length > 0) {
-      await this.prisma.order.createMany({ data: valid });
+      await this.prisma.$transaction(
+        valid.map((v) =>
+          this.prisma.order.create({
+            data: {
+              boutiqueId: v.boutiqueId,
+              customer: v.customer,
+              phone: v.phone,
+              total: v.total,
+              items: {
+                create: v.items,
+              },
+            },
+          }),
+        ),
+      );
     }
 
     return {

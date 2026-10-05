@@ -1,8 +1,7 @@
 .layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  display: flex;
+  flex-direction: column;
   gap: 1.75rem;
-  align-items: start;
 }
 
 .form {
@@ -157,10 +156,44 @@
 }
 
 .importModal {
-  width: min(520px, 92vw);
-  max-height: 85vh;
-  overflow-y: auto;
+  width: min(560px, 92vw);
+  max-height: 90vh;
+  /* overflow-y: auto; */
   animation: slideUp 0.2s ease;
+}
+
+/* Grid for a single order-item row: name | qty | price | remove */
+.itemRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  color: brown;
+  width: min(560px, 92vw);
+}
+
+@media (max-width: 480px) {
+  .overlay {
+    align-items: flex-end;
+  }
+
+  .importModal {
+    width: 100vw;
+    max-height: 92vh;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  /* Stack name on its own line; qty + price share the row */
+  .itemRow {
+    grid-template-columns: 1fr 1fr auto;
+    grid-template-rows: auto auto;
+  }
+
+  .itemRow > input:first-child {
+    grid-column: 1 / -1;
+  }
 }
 
 @keyframes slideUp {

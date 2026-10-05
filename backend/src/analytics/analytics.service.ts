@@ -260,14 +260,15 @@ export class AnalyticsService {
         revenue: number;
       }[]
     >(Prisma.sql`
-      SELECT o.item AS "item",
-             COUNT(*)::int AS "orders",
-             COUNT(*) FILTER (WHERE o.status = 'confirmed')::int AS "confirmed",
-             COUNT(*) FILTER (WHERE o.status = 'cancelled')::int AS "cancelled",
-             COALESCE(SUM(o.total) FILTER (WHERE o.status = 'confirmed'), 0)::float8 AS "revenue"
-      FROM orders o
+      SELECT oi."productName" AS "item",
+             COUNT(DISTINCT o.id)::int AS "orders",
+             COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'confirmed')::int AS "confirmed",
+             COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'cancelled')::int AS "cancelled",
+             COALESCE(SUM(oi.quantity * oi."unitPrice") FILTER (WHERE o.status = 'confirmed'), 0)::float8 AS "revenue"
+      FROM order_items oi
+      JOIN orders o ON o.id = oi."orderId"
       WHERE o."boutiqueId" = ${boutiqueId} AND o."createdAt" >= ${from}
-      GROUP BY o.item
+      GROUP BY oi."productName"
       ORDER BY "orders" DESC, "revenue" DESC
       LIMIT ${TOP_PRODUCTS}
     `);

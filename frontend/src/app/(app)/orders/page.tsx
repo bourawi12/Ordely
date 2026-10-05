@@ -42,6 +42,7 @@ export default async function OrdersPage({
             ))}
           </nav>
           <div className={styles.headerActions}>
+            <NewOrderForm />
             <CsvImportForm />
           </div>
         </div>
@@ -72,8 +73,16 @@ export default async function OrdersPage({
                     <td>{order.customer}</td>
                     <td className={ui.muted}>{order.phone || "—"}</td>
                     <td>
-                      {order.item}
-                      {order.quantity > 1 && <span className={ui.muted}> × {order.quantity}</span>}
+                      {order.items && order.items.length > 0 ? (
+                        order.items.map((item, idx) => (
+                          <div key={item.id || idx}>
+                            {item.productName}
+                            <span className={ui.muted}> × {item.quantity}</span>
+                          </div>
+                        ))
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className={ui.strong}>{formatTND(order.total)}</td>
                     <td>
@@ -87,7 +96,6 @@ export default async function OrdersPage({
           </div>
         )}
       </section>
-      <NewOrderForm />
     </div>
   );
 }

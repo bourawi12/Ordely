@@ -7,16 +7,23 @@ export type OrderStatus = "pending" | "confirmed" | "cancelled";
 export type CallStatus = "pending" | "confirmed" | "failed" | "no_answer";
 export type CallRange = "today" | "7d" | "30d" | "all";
 
+export interface OrderItem {
+  id: number;
+  orderId: number;
+  productName: string;
+  quantity: number;
+  unitPrice: string;
+}
+
 export interface Order {
   id: number;
   customer: string;
   phone: string;
-  item: string;
-  quantity: number;
   /** TND, serialized as a decimal string. */
   total: string;
   status: OrderStatus;
   createdAt: string;
+  items?: OrderItem[];
 }
 
 export interface TranscriptLine {
@@ -339,15 +346,21 @@ completeOnboarding: () =>
     request<Order[]>(`/orders${status ? `?status=${status}` : ""}`),
   getOrder: (id: number) =>
     request<Order & { calls: Call[] }>(`/orders/${id}`),
-  createOrder: (
-    data: Pick<Order, "customer" | "phone" | "item" | "quantity"> & { total: number },
-  ) =>
+  createOrder: (data: {
+    customer: string;
+    phone: string;
+    items: { productName: string; quantity: number; unitPrice?: number }[];
+    total?: number;
+  }) =>
     request<Order>("/orders", { method: "POST", body: JSON.stringify(data) }),
   updateOrder: (
     id: number,
-    data: Partial<
-      Pick<Order, "status" | "customer" | "phone" | "item" | "quantity"> & { total: number }
-    >,
+    data: Partial<{
+      status: OrderStatus;
+      customer: string;
+      phone: string;
+      total: number;
+    }>,
   ) =>
     request<Order>(`/orders/${id}`, {
       method: "PATCH",

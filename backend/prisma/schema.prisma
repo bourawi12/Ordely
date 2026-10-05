@@ -9,18 +9,17 @@ datasource db {
 
 /// Order status: "pending" (awaiting confirmation), "confirmed" or "cancelled".
 model Order {
-  id         Int      @id @default(autoincrement())
+  id         Int         @id @default(autoincrement())
   /// The shop the order belongs to: every read and write is scoped by it.
   boutiqueId Int
-  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
-  customer   String   @db.VarChar
-  phone      String   @default("") @db.VarChar(30)
-  item       String   @db.VarChar
-  quantity   Int
+  boutique   Boutique    @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  customer   String      @db.VarChar
+  phone      String      @default("") @db.VarChar(30)
   /// Order value in TND (3 decimals for millimes).
-  total      Decimal  @default(0) @db.Decimal(10, 3)
-  status     String   @default("pending") @db.VarChar(20)
-  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  total      Decimal     @default(0) @db.Decimal(10, 3)
+  status     String      @default("pending") @db.VarChar(20)
+  createdAt  DateTime    @default(now()) @db.Timestamptz(6)
+  items      OrderItem[]
   calls      Call[]
 
   @@index([boutiqueId, status])
@@ -28,6 +27,19 @@ model Order {
   @@index([status])
   @@index([createdAt])
   @@map("orders")
+}
+
+/// One line item in an order.
+model OrderItem {
+  id          Int     @id @default(autoincrement())
+  orderId     Int
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productName String  @db.VarChar(150)
+  quantity    Int     @default(1)
+  unitPrice   Decimal @default(0) @db.Decimal(10, 3)
+
+  @@index([orderId])
+  @@map("order_items")
 }
 
 /// One confirmation call attempt for an order.
