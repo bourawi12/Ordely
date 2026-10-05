@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AdminModule } from './admin/admin.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuthModule } from './auth/auth.module';
 import { BoutiqueModule } from './boutique/boutique.module';
@@ -27,6 +28,7 @@ import { StorageModule } from './storage/storage.module';
     CallsModule,
     DashboardModule,
     AnalyticsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

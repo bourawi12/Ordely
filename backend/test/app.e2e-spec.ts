@@ -14,6 +14,9 @@ describe('App (e2e)', () => {
   // A second merchant, to prove one shop never reaches another's orders.
   const otherEmail = `e2e-other-${Date.now()}@example.com`;
   const resetEmail = `e2e-reset-${Date.now()}@example.com`;
+  // Back office: an Ordely admin, and a merchant whose numbers are known.
+  const adminEmail = `e2e-admin-${Date.now()}@example.com`;
+  const metricsEmail = `e2e-metrics-${Date.now()}@example.com`;
   // Meets the password rule (upper, lower, digit, special character).
   const PASSWORD = 'Passw0rd!e2e';
   // Emails are kept here instead of going out over SMTP.
@@ -44,7 +47,9 @@ describe('App (e2e)', () => {
   });
 
   afterAll(async () => {
-    const emails = { email: { in: [email, otherEmail, resetEmail] } };
+    const emails = {
+      email: { in: [email, otherEmail, resetEmail, adminEmail, metricsEmail] },
+    };
     const users = await prisma.user.findMany({ where: emails });
     await prisma.user.deleteMany({ where: emails });
     await prisma.boutique.deleteMany({
@@ -680,6 +685,209 @@ describe('App (e2e)', () => {
         .post('/auth/login')
         .send({ email: resetEmail, password: NEW_PASSWORD })
         .expect(200);
+    });
+  });
+
+  describe('back office (/admin)', () => {
+    const ROUTES = [
+      '/admin/overview',
+      '/admin/usage',
+      '/admin/quality',
+      '/admin/revenue',
+      '/admin/merchants',
+      '/admin/cohorts',
+      '/admin/export/merchants',
+    ];
+    const SHOP = `E2E Metrics ${Date.now()}`;
+    const CUSTOMER = 'Secret Customer Name';
+    const CUSTOMER_PHONE = '+216 99 123 456';
+    let admin: { Authorization: string };
+    let shopId: number;
+
+    beforeAll(async () => {
+      const server = app.getHttpServer();
+      await request(server)
+        .post('/auth/register')
+        .send({ email: adminEmail, name: 'Ordely Admin', password: PASSWORD })
+        .expect(201);
+      // Granted in the database, as ADMIN_EMAIL does at startup.
+      await prisma.user.update({
+        where: { email: adminEmail },
+        data: { emailVerifiedAt: new Date(), isPlatformAdmin: true },
+      });
+      const login = await request(server)
+        .post('/auth/login')
+        .send({ email: adminEmail, password: PASSWORD })
+        .expect(200);
+      admin = { Authorization: `Bearer ${login.body.accessToken}` };
+
+      // A starter merchant upgraded 10 days ago: 4 orders, 3 finished calls (2 confirmed,
+      // 1 refused, 60 s each) and 1 call still queued.
+      const DAY = 24 * 60 * 60 * 1000;
+      const shop = await prisma.boutique.create({
+        data: {
+          name: SHOP,
+          sector: 'fashion',
+          onboardingCompletedAt: new Date(),
+          plan: 'starter',
+          planStartedAt: new Date(Date.now() - 10 * DAY),
+          users: {
+            create: {
+              email: metricsEmail,
+              name: 'Metrics Owner',
+              passwordHash: 'x',
+              emailVerifiedAt: new Date(),
+            },
+          },
+        },
+      });
+      shopId = shop.id;
+      const calls = [
+        { status: 'confirmed', durationSeconds: 60 },
+        { status: 'confirmed', durationSeconds: 60 },
+        { status: 'failed', durationSeconds: 60 },
+        { status: 'pending', durationSeconds: null },
+      ];
+      for (const call of calls) {
+        await prisma.order.create({
+          data: {
+            boutiqueId: shopId,
+            customer: CUSTOMER,
+            phone: CUSTOMER_PHONE,
+            item: 'Robe',
+            quantity: 1,
+            total: 100,
+            calls: { create: { ...call, language: 'French' } },
+          },
+        });
+      }
+    });
+
+    it('answers 401 without a session and 403 to a merchant, on every route', async () => {
+      const server = app.getHttpServer();
+      for (const route of ROUTES) {
+        await request(server).get(route).expect(401);
+        await request(server)
+          .get(route)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(403);
+      }
+      await request(server)
+        .get(`/admin/merchants/${shopId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+      // The role is never settable through the API.
+      await request(server)
+        .patch('/auth/profile')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Me', isPlatformAdmin: true })
+        .expect(400);
+    });
+
+    it('serves every report to an admin', async () => {
+      const server = app.getHttpServer();
+      for (const route of ROUTES) {
+        await request(server).get(route).set(admin).expect(200);
+      }
+      for (const dataset of [
+        'overview',
+        'usage',
+        'quality',
+        'revenue',
+        'cohorts',
+      ]) {
+        await request(server)
+          .get(`/admin/export/${dataset}?range=7d`)
+          .set(admin)
+          .expect(200)
+          .expect('Content-Type', /text\/csv/);
+      }
+      await request(server).get('/admin/export/secrets').set(admin).expect(404);
+      await request(server)
+        .get('/admin/overview?range=custom&from=2026-09-10&to=2026-09-01')
+        .set(admin)
+        .expect(400);
+    });
+
+    it("computes a merchant's numbers from its orders and calls", async () => {
+      const server = app.getHttpServer();
+      const list = await request(server)
+        .get(`/admin/merchants?range=30d&search=${encodeURIComponent(SHOP)}`)
+        .set(admin)
+        .expect(200);
+      expect(list.body.total).toBe(1);
+      const row = list.body.rows[0];
+      expect(row).toMatchObject({
+        id: shopId,
+        name: SHOP,
+        ownerEmail: metricsEmail,
+        plan: 'starter',
+        orders: 4,
+        calls: 3,
+        confirmed: 2,
+        refused: 1,
+        monthCalls: 3,
+        quota: 1500,
+        status: 'new',
+        // Recency 40 + results round(2/3 × 30) 20 + momentum 20 + setup 10.
+        health: 90,
+      });
+      expect(row.confirmationRate).toBeCloseTo(2 / 3);
+      // 79 TND a month, 10 of the last 30 days on the plan.
+      expect(row.revenue).toBeCloseTo((79 * 10) / 30, 1);
+
+      const revenue = await request(server)
+        .get('/admin/revenue?range=30d')
+        .set(admin)
+        .expect(200);
+      const { perMinute, perCall } = revenue.body.costs;
+      expect(row.cost).toBeCloseTo(3 * perMinute + 3 * perCall);
+      expect(row.margin).toBeCloseTo(row.revenue - row.cost);
+
+      const detail = await request(server)
+        .get(`/admin/merchants/${shopId}?range=7d`)
+        .set(admin)
+        .expect(200);
+      const sum = (k: string) =>
+        detail.body.daily.reduce(
+          (s: number, d: Record<string, number>) => s + d[k],
+          0,
+        );
+      expect(detail.body.daily).toHaveLength(7);
+      expect([sum('orders'), sum('calls'), sum('confirmed')]).toEqual([
+        4, 3, 2,
+      ]);
+
+      // Never an end customer's name or phone number, in any report or export.
+      for (const route of [
+        `/admin/merchants/${shopId}`,
+        '/admin/merchants',
+        '/admin/quality',
+        '/admin/usage',
+        '/admin/revenue',
+        '/admin/export/merchants',
+        '/admin/export/quality',
+      ]) {
+        const res = await request(server).get(route).set(admin).expect(200);
+        expect(res.text).not.toContain(CUSTOMER);
+        expect(res.text).not.toContain(CUSTOMER_PHONE);
+      }
+    });
+
+    it("leaves the Ordely team's own shops out of the merchants", async () => {
+      const server = app.getHttpServer();
+      const me = await prisma.user.findUniqueOrThrow({
+        where: { email: adminEmail },
+      });
+      await request(server)
+        .get(`/admin/merchants?search=${encodeURIComponent(adminEmail)}`)
+        .set(admin)
+        .expect(200)
+        .expect((res) => expect(res.body.total).toBe(0));
+      await request(server)
+        .get(`/admin/merchants/${me.boutiqueId}`)
+        .set(admin)
+        .expect(404);
     });
   });
 });
