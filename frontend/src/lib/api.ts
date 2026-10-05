@@ -132,6 +132,8 @@ export interface User {
   themeMode: ThemeMode;
   /** Null until the address is confirmed through the emailed link; the app stays closed until then. */
   emailVerifiedAt: string | null;
+  /** Ordely team member: can open the internal back office (/admin). */
+  isPlatformAdmin: boolean;
   createdAt: string;
 }
 
@@ -175,7 +177,7 @@ const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:3001/api";
  * (backend/src/auth/allow-unverified.decorator.ts). */
 const EMAIL_NOT_VERIFIED = "Email address not verified";
 
-async function send(
+export async function send(
   path: string,
   init: RequestInit | undefined,
   auth: boolean,
@@ -218,7 +220,7 @@ async function send(
   return res;
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   init?: RequestInit,
   // `token` stands in for the session cookie, e.g. right after sign-up in the same request.

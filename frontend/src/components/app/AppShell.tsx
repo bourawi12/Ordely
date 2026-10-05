@@ -181,6 +181,12 @@ export default function AppShell({
               <Link href="/settings">
                 <Icon name="settings" size={18} /> Settings
               </Link>
+              {/* Ordely team only: merchants never see this link (and /admin refuses them). */}
+              {user.isPlatformAdmin && (
+                <Link href="/admin">
+                  <Icon name="chart" size={18} /> Back office
+                </Link>
+              )}
               <form action={logout}>
                 <button type="submit">
                   <Icon name="logout" size={18} /> Log out

@@ -19,6 +19,9 @@ const empty: Boutique = {
   acquisitionSource: null,
   carrier: null,
   onboardingCompletedAt: null,
+  plan: null,
+  planStartedAt: null,
+  churnedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
