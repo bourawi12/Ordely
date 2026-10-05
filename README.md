@@ -155,6 +155,24 @@ npm run db:seed -- --reset   # replaces ALL orders and calls
   `/auth/avatar` answers `403 Email address not verified` until then. In development the emails land
   in Mailpit (http://localhost:8025); set `SMTP_*` and `APP_URL` to send real ones.
 
+### Back office (`/admin`, Ordely team only)
+
+An internal dashboard of all merchants: overview KPIs and MRR, activation funnel, usage, call
+quality, revenue and unit economics, a merchants table with a health score, weekly cohorts, and
+CSV exports. Merchants never see it: the API answers `403` on `/api/admin/*` and the frontend sends
+them back to `/dashboard`.
+
+- **Become an admin:** set `ADMIN_EMAIL` (root `.env`) and restart the backend. The account with
+  that address gets `users.isPlatformAdmin` at startup. If it doesn't exist yet and `ADMIN_PASSWORD`
+  is set, it is created (verified, with an empty shop). Then log in at `/login` and open `/admin`
+  (or **Back office** in the user menu). Revoke access in the database.
+- **Plans and prices** live in `backend/src/admin/plans.ts`; a shop's plan is
+  `boutiques.plan` (null = free), with `planStartedAt` and `churnedAt`.
+- **Unit economics** use `COST_PER_MINUTE` and `COST_PER_CALL` (TND, estimates).
+- **Demo data (dev only):** `cd backend && npm run db:seed:demo` creates 45 demo merchants
+  (`@demo.ordely.test`) with several weeks of orders and calls. Re-running replaces them; it
+  refuses to run when `NODE_ENV` is production or the database isn't local.
+
 ### API
 
 - `GET /api/health` — reports app and database status (public)
