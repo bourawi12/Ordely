@@ -72,6 +72,9 @@ services:
       MAIL_FROM: ${MAIL_FROM:-Ordely <no-reply@ordely.tn>}
       # Where the links in emails point: the address users open the app at.
       APP_URL: ${APP_URL:-http://localhost:3200}
+      # Internal back office (/admin): this account gets access at startup.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     depends_on:

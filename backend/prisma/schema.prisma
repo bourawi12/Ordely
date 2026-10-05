@@ -78,6 +78,9 @@ model User {
   passwordResetSentAt    DateTime? @db.Timestamptz(6)
   /// Set by a password reset: sessions issued before it stop working.
   passwordChangedAt      DateTime? @db.Timestamptz(6)
+  /// Ordely team member: opens the internal back office (/admin). Never set through the API;
+  /// granted by ADMIN_EMAIL at startup (src/admin/admin-bootstrap.service.ts) or in the database.
+  isPlatformAdmin        Boolean   @default(false)
   createdAt              DateTime  @default(now()) @db.Timestamptz(6)
 
   @@index([boutiqueId])
