@@ -453,13 +453,12 @@ describe('App (e2e)', () => {
         .send({
           customer: 'E2E',
           phone: '+216 22 000 000',
-          item: 'Test item',
-          quantity: 2,
+          items: [{ productName: 'Test item', quantity: 2, unitPrice: 21.25 }],
           total: 42.5,
         })
         .expect(201);
       const id = created.body.id;
-      expect(created.body).toMatchObject({ status: 'pending', quantity: 2 });
+      expect(created.body).toMatchObject({ status: 'pending', total: '42.5' });
 
       await request(server).get(`/orders/${id}`).set(auth).expect(200);
 
@@ -499,12 +498,11 @@ describe('App (e2e)', () => {
       await request(server)
         .patch(`/orders/${id}`)
         .set(auth)
-        .send({ customer: '  Edited  ', quantity: 3, total: 60 })
+        .send({ customer: '  Edited  ', total: 60 })
         .expect(200)
         .expect((res) =>
           expect(res.body).toMatchObject({
             customer: 'Edited',
-            quantity: 3,
             total: '60',
             status: 'confirmed',
           }),
@@ -512,7 +510,7 @@ describe('App (e2e)', () => {
       await request(server)
         .patch(`/orders/${id}`)
         .set(auth)
-        .send({ quantity: 0 })
+        .send({ total: -1 })
         .expect(400);
       await request(server).delete(`/orders/${id}`).set(auth).expect(204);
       await request(server).get(`/orders/${id}`).set(auth).expect(404);
@@ -527,8 +525,7 @@ describe('App (e2e)', () => {
         .send({
           customer: 'Mine',
           phone: '+216 22 000 001',
-          item: 'Private item',
-          quantity: 1,
+          items: [{ productName: 'Private item', quantity: 1, unitPrice: 10 }],
           total: 10,
         })
         .expect(201);
@@ -625,7 +622,7 @@ describe('App (e2e)', () => {
       return request(app.getHttpServer())
         .post('/orders')
         .set('Authorization', `Bearer ${token}`)
-        .send({ customer: '', quantity: 0 })
+        .send({ customer: '', items: [] })
         .expect(400);
     });
   });
@@ -754,9 +751,10 @@ describe('App (e2e)', () => {
             boutiqueId: shopId,
             customer: CUSTOMER,
             phone: CUSTOMER_PHONE,
-            item: 'Robe',
-            quantity: 1,
             total: 100,
+            items: {
+              create: { productName: 'Robe', quantity: 1, unitPrice: 100 },
+            },
             calls: { create: { ...call, language: 'French' } },
           },
         });
