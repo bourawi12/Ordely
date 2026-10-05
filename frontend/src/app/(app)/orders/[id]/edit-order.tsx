@@ -49,35 +49,17 @@ export default function EditableOrder({ order, children }: { order: Order; child
         />
       </label>
       <label className={ui.field}>
-        Item
-        <input className={ui.input} name="item" defaultValue={order.item} required maxLength={200} />
+        Total (TND)
+        <input
+          className={ui.input}
+          name="total"
+          type="number"
+          min={0}
+          step="0.001"
+          defaultValue={Number(order.total)}
+          required
+        />
       </label>
-      <div className={styles.twoCol}>
-        <label className={ui.field}>
-          Quantity
-          <input
-            className={ui.input}
-            name="quantity"
-            type="number"
-            min={1}
-            max={1000}
-            defaultValue={order.quantity}
-            required
-          />
-        </label>
-        <label className={ui.field}>
-          Total (TND)
-          <input
-            className={ui.input}
-            name="total"
-            type="number"
-            min={0}
-            step="0.001"
-            defaultValue={Number(order.total)}
-            required
-          />
-        </label>
-      </div>
       {state.error && <p className={ui.error}>{state.error}</p>}
       <div className={styles.actions}>
         <button type="submit" className={ui.btn} disabled={pending}>

@@ -14,12 +14,38 @@ export async function createOrder(
   formData: FormData,
 ): Promise<FormState> {
   try {
+    const rawItemsJson = formData.get("itemsJson");
+    let items: { productName: string; quantity: number; unitPrice?: number }[] = [];
+
+    if (rawItemsJson && typeof rawItemsJson === "string") {
+      try {
+        items = JSON.parse(rawItemsJson);
+      } catch {
+        // Fallback to single fields
+      }
+    }
+
+    if (items.length === 0) {
+      const item = String(formData.get("item") ?? "").trim();
+      const quantity = Number(formData.get("quantity") ?? 1);
+      const unitPrice = Number(formData.get("unitPrice") ?? 0);
+      if (item) {
+        items = [{ productName: item, quantity, unitPrice }];
+      }
+    }
+
+    if (items.length === 0) {
+      return { error: "Please add at least one product item." };
+    }
+
+    const totalRaw = formData.get("total");
+    const total = totalRaw ? Number(totalRaw) : undefined;
+
     await api.createOrder({
       customer: String(formData.get("customer") ?? ""),
       phone: String(formData.get("phone") ?? ""),
-      item: String(formData.get("item") ?? ""),
-      quantity: Number(formData.get("quantity")),
-      total: Number(formData.get("total")),
+      items,
+      total,
     });
   } catch (err) {
     // Let the "session expired" redirect through instead of showing it as an error.
@@ -40,12 +66,11 @@ export async function editOrder(
   formData: FormData,
 ): Promise<FormState> {
   try {
+    const totalRaw = formData.get("total");
     await api.updateOrder(id, {
       customer: String(formData.get("customer") ?? ""),
       phone: String(formData.get("phone") ?? ""),
-      item: String(formData.get("item") ?? ""),
-      quantity: Number(formData.get("quantity")),
-      total: Number(formData.get("total")),
+      total: totalRaw ? Number(totalRaw) : undefined,
     });
   } catch (err) {
     unstable_rethrow(err);
