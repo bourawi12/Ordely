@@ -1,0 +1,459 @@
+diff --git a/mock-external-service/agent.js b/mock-external-service/agent.js
+index 8de58ea..f0f9303 100644
+--- a/mock-external-service/agent.js
++++ b/mock-external-service/agent.js
+@@ -26,6 +26,15 @@ async function main() {
+   }
+ 
+   const taskId = process.env.VOICE_TASK_ID || null;
++  // The Ordely task (order and shop) when started through /api/task/start.
++  let task = null;
++  if (process.env.CALL_TASK) {
++    try {
++      task = JSON.parse(process.env.CALL_TASK);
++    } catch {
++      throw new Error('CALL_TASK is not valid JSON.');
++    }
++  }
+   const ordelyClient = taskId ? new OrdelyCallbackClient() : null;
+ 
+   const iceServers = await getIceServers(serverUrl);
+@@ -36,7 +45,7 @@ async function main() {
+     iceServers,
+     ioClient: io,
+     wrtc,
+-    geminiFactory: () => GeminiLiveSession.connect(),
++    geminiFactory: () => GeminiLiveSession.connect({ task }),
+     artifactStore: new AudioArtifactStore(),
+     artifactClient: new CallArtifactClient({ serverUrl }),
+     onStatus: (phase) => process.send?.({ type: 'agent-status', phase }),
+diff --git a/mock-external-service/geminiLiveSession.js b/mock-external-service/geminiLiveSession.js
+index 26273fe..614a77e 100644
+--- a/mock-external-service/geminiLiveSession.js
++++ b/mock-external-service/geminiLiveSession.js
+@@ -10,6 +10,62 @@ const SYSTEM_INSTRUCTION = [
+   'Keep spoken replies concise and conversational.',
+ ].join(' ');
+ 
++/**
++ * Ordely order confirmation. When the agent is started with an Ordely task, Gemini receives
++ * the order (and nothing else) and reports the customer's decision through this function.
++ * Ordely, not the model, then decides what happens to the order.
++ */
++const DECISION_TOOL = {
++  functionDeclarations: [{
++    name: 'report_decision',
++    description: "Report the customer's decision about the order. Call it once, as soon as the customer has clearly confirmed or clearly cancelled the order, or when the conversation ends without a clear answer.",
++    parameters: {
++      type: 'OBJECT',
++      properties: {
++        intent: {
++          type: 'STRING',
++          enum: ['CONFIRMED', 'CANCELLED', 'UNCLEAR'],
++          description: 'CONFIRMED only on a clear yes, CANCELLED only on a clear no or cancellation, otherwise UNCLEAR. Never guess.',
++        },
++        confidence: { type: 'NUMBER', description: 'How sure you are of the intent, from 0 to 1.' },
++        language: {
++          type: 'STRING',
++          enum: ['FRENCH', 'ENGLISH', 'TUNISIAN_ARABIC', 'MIXED'],
++          description: 'The language the customer mostly spoke.',
++        },
++      },
++      required: ['intent', 'confidence', 'language'],
++    },
++  }],
++};
++
++function orderLines(task) {
++  const order = task.order || {};
++  const items = (order.items || [])
++    .map((item) => `- ${item.quantity} x ${item.name}`)
++    .join('\n') || '- (no item details)';
++  return [
++    `Shop: ${task.shop?.name || 'the shop'}`,
++    `Customer name: ${order.customerName || 'unknown'}`,
++    `Order number: ${order.id ?? 'unknown'}`,
++    'Items:',
++    items,
++    `Total to pay on delivery: ${order.total ?? 'unknown'} ${order.currency || 'TND'}`,
++  ].join('\n');
++}
++
++function orderInstruction(task) {
++  return [
++    'This is a cash-on-delivery order confirmation call made for the shop below. Your only goal is to find out whether the customer confirms or cancels this order.',
++    'ORDER (the only facts you may state; never invent or change anything):',
++    orderLines(task),
++    'Greet the customer by name, say you are calling from the shop about their order, state the items and the total, then ask clearly whether they confirm it.',
++    'A clear yes (for example: إيه، نعم، نكونفيرمي، oui، c\'est bon، yes) is a confirmation. A clear no or cancellation (for example: لا، ما نحبش، annulez، no) is a cancellation. Anything else (a question, hesitation, "call me later", a wrong person) is not a decision: ask one short question to clarify.',
++    'Never treat an ambiguous answer as a confirmation. You cannot change the order (items, address, price, date); if asked, say the shop will contact them, then ask again whether they confirm the order as it is.',
++    'As soon as the customer has clearly confirmed or cancelled, call report_decision, then thank them and say goodbye in one short sentence. If the conversation ends without a clear answer, call report_decision with intent UNCLEAR.',
++  ].join('\n');
++}
++
+ function normalizeLiveMessage(message) {
+   const events = [];
+   const content = message.serverContent;
+@@ -32,20 +88,26 @@ function normalizeLiveMessage(message) {
+     if (part.text) events.push({ type: 'output-text', text: part.text });
+   }
+   if (content?.turnComplete) events.push({ type: 'turn-complete' });
++  for (const call of message.toolCall?.functionCalls || []) {
++    if (call.name === 'report_decision') {
++      events.push({ type: 'decision', id: call.id, name: call.name, args: call.args || {} });
++    }
++  }
+   if (message.goAway) events.push({ type: 'session-expiring', timeLeft: message.goAway.timeLeft });
+   if (message.error) events.push({ type: 'error', error: message.error });
+   return events;
+ }
+ 
+ class GeminiLiveSession {
+-  constructor({ session, callbacks, model = MODEL }) {
++  constructor({ session, callbacks, model = MODEL, task = null }) {
+     this.session = session;
+     this.callbacks = callbacks;
+     this.model = model;
++    this.task = task;
+     this.closed = false;
+   }
+ 
+-  static async connect({ apiKey = process.env.GEMINI_API_KEY, model = MODEL, client } = {}) {
++  static async connect({ apiKey = process.env.GEMINI_API_KEY, model = MODEL, client, task = null } = {}) {
+     if (!client && !apiKey) throw new Error('GEMINI_API_KEY is required by the external agent service.');
+     const genai = client || new GoogleGenAI({ apiKey });
+     const callbacks = new Set();
+@@ -60,7 +122,8 @@ class GeminiLiveSession {
+       model,
+       config: {
+         responseModalities: ['AUDIO'],
+-        systemInstruction: SYSTEM_INSTRUCTION,
++        systemInstruction: task ? `${SYSTEM_INSTRUCTION}\n\n${orderInstruction(task)}` : SYSTEM_INSTRUCTION,
++        ...(task ? { tools: [DECISION_TOOL] } : {}),
+         inputAudioTranscription: {},
+         outputAudioTranscription: {},
+         realtimeInputConfig: {
+@@ -111,7 +174,7 @@ class GeminiLiveSession {
+     } finally {
+       clearTimeout(setupTimer);
+     }
+-    return new GeminiLiveSession({ session, callbacks, model });
++    return new GeminiLiveSession({ session, callbacks, model, task });
+   }
+ 
+   onEvent(callback) {
+@@ -120,6 +183,10 @@ class GeminiLiveSession {
+   }
+ 
+   introduce() {
++    if (this.task) {
++      this.speak('The customer has just answered the phone. Greet them by name in Tunisian Derja using Arabic script, say you are calling from the shop about their order, state the items and the total, and ask whether they confirm the order.');
++      return;
++    }
+     this.speak('Greet the person who just answered. Introduce yourself briefly in Tunisian Derja using Arabic script, with natural French only if it fits, and invite them to speak. Keep the greeting distinctly Tunisian.');
+   }
+ 
+@@ -144,6 +211,12 @@ class GeminiLiveSession {
+     });
+   }
+ 
++  /** Tells Gemini the decision was recorded, so it goes on (thanks and goodbye). */
++  acknowledgeTool(id, name) {
++    if (this.closed) return;
++    this.session.sendToolResponse({ functionResponses: [{ id, name, response: { result: 'recorded' } }] });
++  }
++
+   endAudioStream() {
+     if (!this.closed) this.session.sendRealtimeInput({ audioStreamEnd: true });
+   }
+@@ -156,4 +229,6 @@ class GeminiLiveSession {
+   }
+ }
+ 
+-module.exports = { GeminiLiveSession, MODEL, SYSTEM_INSTRUCTION, normalizeLiveMessage };
+\ No newline at end of file
++module.exports = {
++  DECISION_TOOL, GeminiLiveSession, MODEL, SYSTEM_INSTRUCTION, normalizeLiveMessage, orderInstruction,
++};
+\ No newline at end of file
+diff --git a/mock-external-service/ordelyCallbackClient.js b/mock-external-service/ordelyCallbackClient.js
+index 1b0302d..49a9efc 100644
+--- a/mock-external-service/ordelyCallbackClient.js
++++ b/mock-external-service/ordelyCallbackClient.js
+@@ -74,8 +74,11 @@ class OrdelyCallbackClient {
+   async sendResult({
+     taskId,
+     providerCallId,
+-    disposition = 'confirmed',
++    disposition = 'completed',
+     durationSeconds,
++    intent,
++    confidence,
++    language,
+     error,
+   }) {
+     if (!this.enabled || !taskId) return;
+@@ -91,6 +94,9 @@ class OrdelyCallbackClient {
+           providerCallId,
+           disposition,
+           durationSeconds,
++          intent,
++          confidence,
++          language,
+           timestamp: new Date().toISOString(),
+           error,
+         }),
+diff --git a/mock-external-service/voiceCallAgent.js b/mock-external-service/voiceCallAgent.js
+index 50b104f..41ea7b0 100644
+--- a/mock-external-service/voiceCallAgent.js
++++ b/mock-external-service/voiceCallAgent.js
+@@ -16,6 +16,7 @@ class VoiceCallAgent {
+     onStatus = () => {},
+     taskId = null,
+     ordelyClient = null,
++    decisionHangupMs = Number(process.env.DECISION_HANGUP_MS || 6000),
+   }) {
+     if (!serverUrl || !destinationNumber || !ioClient || !wrtc || !geminiFactory || !artifactStore || !artifactClient) {
+       throw new Error('VoiceCallAgent requires server, destination, Socket.IO, WebRTC, Gemini, and storage dependencies.');
+@@ -43,6 +44,10 @@ class VoiceCallAgent {
+     };
+     this.taskId = taskId;
+     this.ordelyClient = ordelyClient;
++    this.decisionHangupMs = decisionHangupMs;
++    /** The customer's decision as reported by Gemini (report_decision), sent to Ordely. */
++    this.decision = null;
++    this.hangupTimer = null;
+     this.transcriptSequence = 0;
+     this.startTime = null;
+     this.socket = null;
+@@ -242,6 +247,8 @@ class VoiceCallAgent {
+         });
+       }
+       await this.transcriptWrites;
++    } else if (event.type === 'decision') {
++      this.recordDecision(event);
+     } else if (event.type === 'interrupted') {
+       this.bridge.stopOutput();
+     } else if (event.type === 'turn-complete') {
+@@ -259,6 +266,29 @@ class VoiceCallAgent {
+     }
+   }
+ 
++  /** Keeps the latest decision; after a clear one, hangs up once the goodbye has been said. */
++  recordDecision({ id, name, args }) {
++    const intents = ['CONFIRMED', 'CANCELLED', 'UNCLEAR'];
++    const languages = ['FRENCH', 'ENGLISH', 'TUNISIAN_ARABIC', 'MIXED'];
++    const confidence = Number(args.confidence);
++    this.decision = {
++      intent: intents.includes(args.intent) ? args.intent : 'UNCLEAR',
++      confidence: Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0,
++      language: languages.includes(args.language) ? args.language : undefined,
++    };
++    this.logger.info(`Decision reported: ${this.decision.intent} (${this.decision.confidence}).`);
++    try {
++      this.gemini?.acknowledgeTool?.(id, name);
++    } catch (error) {
++      this.logger.warn(`Could not acknowledge the decision: ${error.message}`);
++    }
++    if (this.decision.intent !== 'UNCLEAR' && !this.hangupTimer && !this.closing) {
++      this.hangupTimer = setTimeout(() => {
++        this.stop().catch((error) => this.logger.error(error.message));
++      }, this.decisionHangupMs);
++    }
++  }
++
+   async fail(error) {
+     if (this.closing || this.finished) return;
+     this.logger.error(error.message);
+@@ -283,6 +313,7 @@ class VoiceCallAgent {
+   }
+ 
+   async cleanup(message) {
++    clearTimeout(this.hangupTimer);
+     this.removeGeminiListener?.();
+     this.gemini?.close();
+     if (this.peer) this.peer.close();
+@@ -310,12 +341,14 @@ class VoiceCallAgent {
+       }
+     }
+     if (this.ordelyClient && this.taskId) {
++      // The outcome is the customer's decision as Gemini reported it; Ordely validates it.
++      // A call that simply ended is "completed", never "confirmed" on its own.
+       const disposition =
+         this.finishPhase === 'rejected'
+           ? 'no_answer'
+           : this.finishPhase === 'error'
+             ? 'error'
+-            : 'confirmed';
++            : 'completed';
+       const durationSeconds = this.startTime
+         ? Math.round((Date.now() - this.startTime) / 1000)
+         : 0;
+@@ -324,6 +357,7 @@ class VoiceCallAgent {
+         providerCallId: this.callId,
+         disposition,
+         durationSeconds,
++        ...(this.decision || {}),
+       }).catch((err) => this.logger.error('Ordely result callback error:', err.message));
+     }
+     this.finished = true;
+diff --git a/mock-external-service/test/ordelyTask.test.js b/mock-external-service/test/ordelyTask.test.js
+new file mode 100644
+index 0000000..12522f8
+--- /dev/null
++++ b/mock-external-service/test/ordelyTask.test.js
+@@ -0,0 +1,154 @@
++const assert = require('node:assert/strict');
++const { test } = require('node:test');
++const { GeminiLiveSession, normalizeLiveMessage } = require('../geminiLiveSession');
++const { VoiceCallAgent } = require('../voiceCallAgent');
++
++const task = {
++  taskId: 'call-7',
++  destination: '+15550001234',
++  order: {
++    id: 70,
++    customerName: 'Ines Gharbi',
++    items: [{ name: 'Montre connectée', quantity: 2, unitPrice: '120' }],
++    total: '240',
++    currency: 'TND',
++  },
++  shop: { name: 'Chez Ada', languages: ['darija'] },
++};
++
++test('with an Ordely task, Gemini gets the order and a report_decision function', async () => {
++  let params;
++  const calls = [];
++  const client = {
++    live: {
++      connect: async (p) => {
++        params = p;
++        queueMicrotask(() => p.callbacks.onmessage({ setupComplete: {} }));
++        return {
++          sendClientContent: (payload) => calls.push(['content', payload]),
++          sendToolResponse: (payload) => calls.push(['tool', payload]),
++          close() {},
++        };
++      },
++    },
++  };
++  const live = await GeminiLiveSession.connect({ client, task });
++  const instruction = params.config.systemInstruction;
++  for (const fact of ['Ines Gharbi', '2 x Montre connectée', '240 TND', 'Chez Ada', 'report_decision']) {
++    assert.ok(instruction.includes(fact), `instruction mentions ${fact}`);
++  }
++  assert.equal(params.config.tools[0].functionDeclarations[0].name, 'report_decision');
++
++  live.introduce();
++  assert.match(calls[0][1].turns[0].parts[0].text, /confirm the order/);
++  live.acknowledgeTool('fc-1', 'report_decision');
++  assert.deepEqual(calls[1], ['tool', { functionResponses: [{ id: 'fc-1', name: 'report_decision', response: { result: 'recorded' } }] }]);
++});
++
++test('without a task, nothing changes: no tools, the original instruction', async () => {
++  let params;
++  const client = {
++    live: {
++      connect: async (p) => {
++        params = p;
++        queueMicrotask(() => p.callbacks.onmessage({ setupComplete: {} }));
++        return { sendClientContent() {}, close() {} };
++      },
++    },
++  };
++  await GeminiLiveSession.connect({ client });
++  assert.equal(params.config.tools, undefined);
++  assert.doesNotMatch(params.config.systemInstruction, /report_decision/);
++});
++
++test('reads a report_decision function call as a decision event', () => {
++  const events = normalizeLiveMessage({
++    toolCall: {
++      functionCalls: [
++        { id: 'fc-1', name: 'report_decision', args: { intent: 'CONFIRMED', confidence: 0.94, language: 'TUNISIAN_ARABIC' } },
++        { id: 'fc-2', name: 'something_else', args: {} },
++      ],
++    },
++  });
++  assert.deepEqual(events, [
++    { type: 'decision', id: 'fc-1', name: 'report_decision', args: { intent: 'CONFIRMED', confidence: 0.94, language: 'TUNISIAN_ARABIC' } },
++  ]);
++});
++
++test('sends the decision to Ordely as the result, and hangs up after a clear answer', async () => {
++  const handlers = new Map();
++  const socket = {
++    connected: true,
++    on: (event, cb) => handlers.set(event, cb),
++    emit() {},
++    disconnect() { this.connected = false; },
++    io: { on() {} },
++  };
++  let listener;
++  const acknowledged = [];
++  const results = [];
++  const agent = new VoiceCallAgent({
++    serverUrl: 'http://127.0.0.1:9',
++    destinationNumber: '+15550001234',
++    ioClient: () => socket,
++    wrtc: {},
++    geminiFactory: async () => ({
++      onEvent(cb) { listener = cb; return () => {}; },
++      acknowledgeTool: (id, name) => acknowledged.push([id, name]),
++      close() {},
++    }),
++    artifactStore: { finalizeCall: async () => [] },
++    artifactClient: { appendTranscript: async () => {}, saveAudioAssets: async () => {} },
++    logger: { info() {}, warn() {}, error() {} },
++    taskId: 'call-7',
++    ordelyClient: {
++      sendEvent: async () => {},
++      sendTranscript: async () => {},
++      uploadRecording: async () => {},
++      sendResult: async (r) => results.push(r),
++    },
++    decisionHangupMs: 5,
++  });
++
++  const finished = agent.start();
++  handlers.get('connect')();
++  handlers.get('participant:registered')();
++  handlers.get('call:outgoing')({ callId: 'c-1', number: '+15550001234' });
++  for (let i = 0; i < 20 && !listener; i += 1) await new Promise(setImmediate);
++
++  listener({ type: 'decision', id: 'fc-1', name: 'report_decision', args: { intent: 'CONFIRMED', confidence: 0.94, language: 'TUNISIAN_ARABIC' } });
++  await finished;
++
++  assert.deepEqual(acknowledged, [['fc-1', 'report_decision']]);
++  assert.equal(results.length, 1);
++  assert.equal(results[0].disposition, 'completed');
++  assert.equal(results[0].intent, 'CONFIRMED');
++  assert.equal(results[0].confidence, 0.94);
++  assert.equal(results[0].language, 'TUNISIAN_ARABIC');
++});
++
++test('a call that ends without any decision is reported as completed, never confirmed', async () => {
++  const handlers = new Map();
++  const socket = { connected: true, on: (e, cb) => handlers.set(e, cb), emit() {}, disconnect() {}, io: { on() {} } };
++  const results = [];
++  const agent = new VoiceCallAgent({
++    serverUrl: 'http://127.0.0.1:9',
++    destinationNumber: '+15550001234',
++    ioClient: () => socket,
++    wrtc: {},
++    geminiFactory: async () => ({ onEvent: () => () => {}, close() {} }),
++    artifactStore: { finalizeCall: async () => [] },
++    artifactClient: { appendTranscript: async () => {}, saveAudioAssets: async () => {} },
++    logger: { info() {}, warn() {}, error() {} },
++    taskId: 'call-8',
++    ordelyClient: { sendEvent: async () => {}, sendResult: async (r) => results.push(r) },
++  });
++  const finished = agent.start();
++  handlers.get('connect')();
++  handlers.get('participant:registered')();
++  handlers.get('call:outgoing')({ callId: 'c-2', number: '+15550001234' });
++  handlers.get('call:ended')({ reason: 'completed' });
++  await finished;
++  assert.equal(results[0].disposition, 'completed');
++  assert.equal(results[0].intent, undefined);
++});
