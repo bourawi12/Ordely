@@ -72,6 +72,9 @@ services:
       MAIL_FROM: ${MAIL_FROM:-Ordely <no-reply@ordely.tn>}
       # Where the links in emails point: the address users open the app at.
       APP_URL: ${APP_URL:-http://localhost:3200}
+      VOICE_AGENT_BASE_URL: ${VOICE_AGENT_BASE_URL:-http://host.docker.internal:4200}
+      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-dev-test-token}
+      ORDELY_CALLBACK_SECRET: ${ORDELY_CALLBACK_SECRET:-dev-test-token}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     depends_on:
