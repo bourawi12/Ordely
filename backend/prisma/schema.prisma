@@ -109,10 +109,18 @@ model Boutique {
   acquisitionSource     String?   @db.VarChar(30)
   carrier               String?   @db.VarChar(30)
   onboardingCompletedAt DateTime? @db.Timestamptz(6)
+  // Billing (back office). Codes and prices live in backend/src/admin/plans.ts.
+  /// Paid plan code ("starter", "growth", "pro"); null = the free plan.
+  plan                  String?   @db.VarChar(20)
+  /// When the paid plan started (first upgrade or last change).
+  planStartedAt         DateTime? @db.Timestamptz(6)
+  /// When the paid subscription was cancelled: the shop is back on the free plan from then on.
+  churnedAt             DateTime? @db.Timestamptz(6)
   createdAt             DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   users                 User[]
   orders                Order[]
 
+  @@index([createdAt])
   @@map("boutiques")
 }
