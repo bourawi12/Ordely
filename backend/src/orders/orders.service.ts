@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Order } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus, UpdateOrderDto } from './dto/update-order.dto';
 
@@ -39,7 +40,10 @@ export interface ImportResult {
 /** Every query is scoped by the signed-in user's shop: another shop's order is a 404. */
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtimeService: RealtimeService,
+  ) {}
 
   findAll(boutiqueId: number, status?: OrderStatus): Promise<Order[]> {
     return this.prisma.order.findMany({
@@ -71,7 +75,7 @@ export class OrdersService {
         0,
       );
 
-    return this.prisma.order.create({
+    const created = await this.prisma.order.create({
       data: {
         customer: dto.customer,
         phone: dto.phone,
@@ -87,6 +91,14 @@ export class OrdersService {
       },
       include: { items: true },
     });
+
+    this.realtimeService.emitOrderCreated(boutiqueId, {
+      orderId: created.id,
+      status: created.status,
+      createdAt: created.createdAt.toISOString(),
+    });
+
+    return created;
   }
 
   async update(
@@ -95,11 +107,19 @@ export class OrdersService {
     dto: UpdateOrderDto,
   ): Promise<Order> {
     await this.ensureExists(boutiqueId, id);
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { id },
       data: dto,
       include: { items: true },
     });
+    if (dto.status) {
+      this.realtimeService.emitOrderStatusChanged(boutiqueId, {
+        orderId: updated.id,
+        status: updated.status,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    return updated;
   }
 
   private async ensureExists(boutiqueId: number, id: number) {
@@ -116,6 +136,11 @@ export class OrdersService {
     if (count === 0) {
       throw new NotFoundException(`Order ${id} not found`);
     }
+    this.realtimeService.emitOrderStatusChanged(boutiqueId, {
+      orderId: id,
+      status: 'deleted',
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -255,6 +280,12 @@ export class OrdersService {
           }),
         ),
       );
+
+      this.realtimeService.emitOrderCreated(boutiqueId, {
+        orderId: 0,
+        status: 'imported',
+        createdAt: new Date().toISOString(),
+      });
     }
 
     return {

@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
@@ -27,6 +28,14 @@ describe('OrdersService', () => {
             $transaction: prismaTransaction,
           },
         },
+        {
+          provide: RealtimeService,
+          useValue: {
+            emitOrderCreated: jest.fn(),
+            emitOrderStatusChanged: jest.fn(),
+            emitCallStatusChanged: jest.fn(),
+          },
+        },
       ],
     }).compile();
     service = moduleRef.get(OrdersService);
@@ -49,7 +58,12 @@ describe('OrdersService', () => {
       items: [{ productName: 'Coffee', quantity: 2, unitPrice: 6.25 }],
       total: 12.5,
     };
-    order.create.mockResolvedValue({ id: 1, status: 'pending', ...dto });
+    order.create.mockResolvedValue({
+      id: 1,
+      status: 'pending',
+      createdAt: new Date(),
+      ...dto,
+    });
     await expect(service.create(7, dto)).resolves.toMatchObject({ id: 1 });
     expect(order.create).toHaveBeenCalledWith({
       data: {
