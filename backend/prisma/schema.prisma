@@ -45,19 +45,30 @@ model OrderItem {
 /// One confirmation call attempt for an order.
 /// Status: "pending" (queued), "confirmed", "failed" or "no_answer".
 model Call {
-  id              Int      @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   orderId         Int
-  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  status          String   @default("pending") @db.VarChar(20)
-  attempt         Int      @default(1)
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status          String    @default("pending") @db.VarChar(20)
+  attempt         Int       @default(1)
   durationSeconds Int?
-  language        String?  @db.VarChar(30)
+  language        String?   @db.VarChar(30)
   /// [{ "speaker": "agent" | "customer", "text": string }]
   transcript      Json?
   recordingUrl    String?
-  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  // Voice agent (Ringio). Nothing here is set for calls made another way.
+  /// When the call was handed to the voice agent; null while still queued in Ordely.
+  dispatchedAt    DateTime? @db.Timestamptz(6)
+  /// The voice provider's own call id, for support and debugging.
+  providerCallId  String?   @db.VarChar(64)
+  /// Raw transcript fragments as streamed by the agent: [{ seq, speaker, text }].
+  /// `transcript` holds the readable version (consecutive fragments merged).
+  transcriptParts Json?
+  /// Private object-storage keys of the call audio: { agent?: key, customer?: key }.
+  recordingKeys   Json?
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
 
   @@index([orderId])
+  @@index([status, dispatchedAt])
   @@index([status])
   @@index([createdAt])
   @@map("calls")

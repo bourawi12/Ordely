@@ -43,6 +43,12 @@ export interface Call {
   createdAt: string;
 }
 
+/** One call with its order and, for voice agent calls, signed links to each speaker's audio. */
+export type CallDetail = CallWithOrder & {
+  attempts: number;
+  recordings?: { agent: string | null; customer: string | null };
+};
+
 export type CallWithOrder = Call & {
   order: Pick<Order, "id" | "customer" | "phone" | "total">;
 };
@@ -333,8 +339,7 @@ completeOnboarding: () =>
   usage: () => request<Usage>("/calls/usage"),
   listCalls: (filters: CallFilters) =>
     request<CallsPage>(`/calls${query({ ...filters })}`),
-  getCall: (id: number) =>
-    request<CallWithOrder & { attempts: number }>(`/calls/${id}`),
+  getCall: (id: number) => request<CallDetail>(`/calls/${id}`),
   exportCalls: async (filters: Omit<CallFilters, "page">) =>
     (await send(`/calls/export${query({ ...filters })}`, undefined, true)).text(),
   queueCall: (orderId: number) =>

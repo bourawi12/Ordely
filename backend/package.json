@@ -23,7 +23,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
-    "db:seed:demo": "ts-node prisma/seed-demo-merchants.ts"
+    "db:seed:demo": "ts-node prisma/seed-demo-merchants.ts",
+    "voice:fake-agent": "node scripts/fake-voice-agent.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

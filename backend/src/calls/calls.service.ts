@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { DAY_MS, DEFAULT_TIMEZONE, startOf } from '../common/time';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { CALL_STATUSES, CallRange, CallStatus } from './call-status';
 import { CallFiltersDto, ListCallsDto } from './dto/list-calls.dto';
 import { UpdateCallDto } from './dto/update-call.dto';
@@ -19,11 +20,21 @@ const withOrder = {
 } satisfies Prisma.CallInclude;
 
 /** Calls belong to a shop through their order: every query is scoped by `order.boutiqueId`. */
+/** A call as the API returns it: without the voice agent's raw fragments and storage keys. */
+function publicCall<
+  T extends { transcriptParts?: unknown; recordingKeys?: unknown },
+>(call: T): Omit<T, 'transcriptParts' | 'recordingKeys'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { transcriptParts, recordingKeys, ...rest } = call;
+  return rest;
+}
+
 @Injectable()
 export class CallsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
   ) {}
 
   private get timezone() {
@@ -57,7 +68,7 @@ export class CallsService {
     }
 
     return {
-      items,
+      items: items.map(publicCall),
       total,
       page: query.page,
       pageSize: query.pageSize,
@@ -119,37 +130,48 @@ export class CallsService {
     const attempts = await this.prisma.call.count({
       where: { orderId: call.orderId },
     });
-    return { ...call, attempts };
+    // Voice agent recordings are private: short-lived signed links, one per speaker.
+    const keys = (call.recordingKeys ?? {}) as {
+      agent?: string;
+      customer?: string;
+    };
+    const recordings = {
+      agent: keys.agent ? await this.storage.url(keys.agent) : null,
+      customer: keys.customer ? await this.storage.url(keys.customer) : null,
+    };
+    return {
+      ...publicCall(call),
+      recordingUrl:
+        call.recordingUrl ?? recordings.customer ?? recordings.agent,
+      recordings,
+      attempts,
+    };
   }
 
   /** Records the outcome of a call (status, duration, transcript, …). */
-async update(
-  boutiqueId: number,
-  id: number,
-  dto: UpdateCallDto,
-) {
-  await this.findOne(boutiqueId, id);
+  async update(boutiqueId: number, id: number, dto: UpdateCallDto) {
+    await this.findOne(boutiqueId, id);
 
-  return this.prisma.call.update({
-    where: { id },
-    data: {
-      status: dto.status,
-      ...(dto.durationSeconds !== undefined && {
-        durationSeconds: dto.durationSeconds,
-      }),
-      ...(dto.language !== undefined && {
-        language: dto.language,
-      }),
-      ...(dto.transcript !== undefined && {
-        transcript: dto.transcript as unknown as Prisma.InputJsonValue,
-      }),
-      ...(dto.recordingUrl !== undefined && {
-        recordingUrl: dto.recordingUrl,
-      }),
-    },
-    include: withOrder,
-  });
-}
+    return this.prisma.call.update({
+      where: { id },
+      data: {
+        status: dto.status,
+        ...(dto.durationSeconds !== undefined && {
+          durationSeconds: dto.durationSeconds,
+        }),
+        ...(dto.language !== undefined && {
+          language: dto.language,
+        }),
+        ...(dto.transcript !== undefined && {
+          transcript: dto.transcript as unknown as Prisma.InputJsonValue,
+        }),
+        ...(dto.recordingUrl !== undefined && {
+          recordingUrl: dto.recordingUrl,
+        }),
+      },
+      include: withOrder,
+    });
+  }
 
   /** Queues a confirmation call for a pending order. */
   async queue(boutiqueId: number, orderId: number) {

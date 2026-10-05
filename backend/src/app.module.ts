@@ -13,6 +13,7 @@ import { MailModule } from './mail/mail.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StorageModule } from './storage/storage.module';
+import { VoiceModule } from './voice/voice.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { StorageModule } from './storage/storage.module';
     DashboardModule,
     AnalyticsModule,
     AdminModule,
+    VoiceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
