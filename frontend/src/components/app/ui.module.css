@@ -179,6 +179,15 @@
   font-size: 0.9rem;
   font-weight: 500;
 }
+.input2 {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 200;
+}
 
 .input {
   padding: 0.6rem 0.8rem;
@@ -187,7 +196,7 @@
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-weight: 400;
+  font-weight: 200;
 }
 
 .input:focus {

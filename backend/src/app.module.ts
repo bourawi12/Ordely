@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AdminModule } from './admin/admin.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuthModule } from './auth/auth.module';
 import { BoutiqueModule } from './boutique/boutique.module';
@@ -11,6 +12,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { MailModule } from './mail/mail.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { StorageModule } from './storage/storage.module';
 import { VoiceModule } from './voice/voice.module';
 
@@ -29,6 +31,8 @@ import { VoiceModule } from './voice/voice.module';
     CallsModule,
     DashboardModule,
     AnalyticsModule,
+    RealtimeModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

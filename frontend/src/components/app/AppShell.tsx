@@ -8,6 +8,7 @@ import Logo from "@/components/Logo";
 import { logout } from "@/app/(auth)/actions";
 import type { Usage, User } from "@/lib/api";
 import { initials } from "@/lib/format";
+import { useRealtime } from "@/components/RealtimeProvider";
 import styles from "./shell.module.css";
 
 const COLLAPSED_KEY = "ordely.sidebarCollapsed";
@@ -35,6 +36,7 @@ export default function AppShell({
   const [menuOpen, setMenuOpen] = useState(false);
   // Desktop only: sidebar shrunk to an icon rail. Remembered per browser.
   const [collapsed, setCollapsed] = useState(false);
+  const { notifications, unreadCount, markAllAsRead } = useRealtime();
 
   useEffect(() => {
     try {
@@ -130,9 +132,37 @@ export default function AppShell({
               {current?.href === "/dashboard" || !current ? `Welcome back, ${firstName}` : current.subtitle}
             </p>
           </div>
-          <button type="button" className={styles.iconBtn} aria-label="Notifications">
-            <Icon name="bell" size={20} />
-          </button>
+          <details className={styles.notifDetails} onToggle={(e) => (e.currentTarget as HTMLDetailsElement).open && markAllAsRead()}>
+            <summary className={`${styles.iconBtn} ${styles.notifBtn}`} aria-label="Notifications">
+              <Icon name="bell" size={20} />
+              {unreadCount > 0 && <span className={styles.notifBadge}>{unreadCount}</span>}
+            </summary>
+            <div className={styles.notifMenu}>
+              <div className={styles.notifHeader}>
+                <span>Notifications</span>
+                {notifications.length > 0 && (
+                  <button type="button" onClick={markAllAsRead}>
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              <div className={styles.notifList}>
+                {notifications.length === 0 ? (
+                  <div className={styles.emptyNotif}>No notifications yet</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div key={n.id} className={`${styles.notifItem} ${!n.read ? styles.unread : ""}`}>
+                      <div className={styles.notifItemHeader}>
+                        <span className={styles.notifItemTitle}>{n.title}</span>
+                        <span className={styles.notifItemTime}>{n.timestamp}</span>
+                      </div>
+                      <p className={styles.notifItemMsg}>{n.message}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </details>
           <details className={styles.user}>
             <summary className={styles.userBtn}>
               <span className={styles.avatar} aria-hidden="true">
@@ -151,6 +181,12 @@ export default function AppShell({
               <Link href="/settings">
                 <Icon name="settings" size={18} /> Settings
               </Link>
+              {/* Ordely team only: merchants never see this link (and /admin refuses them). */}
+              {user.isPlatformAdmin && (
+                <Link href="/admin">
+                  <Icon name="chart" size={18} /> Back office
+                </Link>
+              )}
               <form action={logout}>
                 <button type="submit">
                   <Icon name="logout" size={18} /> Log out

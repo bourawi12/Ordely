@@ -43,9 +43,17 @@ export default async function OrderPage({
               <dd>{order.customer}</dd>
               <dt>Phone</dt>
               <dd>{order.phone || "—"}</dd>
-              <dt>Item</dt>
+              <dt>Items</dt>
               <dd>
-                {order.item} × {order.quantity}
+                {order.items && order.items.length > 0 ? (
+                  order.items.map((item, idx) => (
+                    <div key={item.id || idx}>
+                      {item.productName} × {item.quantity}
+                    </div>
+                  ))
+                ) : (
+                  "—"
+                )}
               </dd>
               <dt>Total</dt>
               <dd>{formatTND(order.total)}</dd>

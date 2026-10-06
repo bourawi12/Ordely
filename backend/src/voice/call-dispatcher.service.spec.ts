@@ -25,8 +25,7 @@ describe('CallDispatcherService', () => {
       boutiqueId: 1,
       customer: 'Sami Ben Ali',
       phone: '+216 20 123 456',
-      item: 'Robe d’été',
-      quantity: 2,
+      items: [{ productName: 'Robe d’été', quantity: 2 }],
       total: new Decimal('120.500'),
       boutique: {
         id: 1,
@@ -63,6 +62,8 @@ describe('CallDispatcherService', () => {
     expect(task.orderlyCallId).toBe(101);
     expect(task.destination).toBe('+21620123456');
     expect(task.scenario.customer).toBe('Sami Ben Ali');
+    expect(task.scenario.item).toBe('Robe d’été x2');
+    expect(task.scenario.quantity).toBe(2);
     expect(task.scenario.total).toBe('120.500 TND');
 
     expect(prismaMock.call.update).toHaveBeenCalledWith({

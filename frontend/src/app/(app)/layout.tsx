@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AppShell from "@/components/app/AppShell";
+import RealtimeProvider from "@/components/RealtimeProvider";
 import { api } from "@/lib/api";
 import { stepHref } from "@/lib/onboarding";
 import { accentStyle, themeClass } from "@/lib/theme";
@@ -27,9 +28,11 @@ export default async function AppLayout({
       // The user's accent colour: CSS variables, computed for both themes.
       style={accentStyle(user.accentColor)}
     >
-      <AppShell user={user} usage={usage}>
-        {children}
-      </AppShell>
+      <RealtimeProvider>
+        <AppShell user={user} usage={usage}>
+          {children}
+        </AppShell>
+      </RealtimeProvider>
     </div>
   );
 }

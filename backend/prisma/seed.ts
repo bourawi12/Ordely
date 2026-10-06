@@ -167,16 +167,24 @@ async function main() {
     const first = pick(FIRST_NAMES);
     const [item, min, max] = pick(PRODUCTS);
     const quantity = rand() < 0.8 ? 1 : between(2, 3);
-    const total = between(min, max) * quantity + (rand() < 0.3 ? 0.5 : 0);
+    const unitPrice = between(min, max);
+    const total = unitPrice * quantity + (rand() < 0.3 ? 0.5 : 0);
     const order: Prisma.OrderCreateInput = {
       customer: `${first} ${pick(LAST_NAMES)}`,
       phone: phone(),
-      item,
-      quantity,
       total,
       status: 'pending',
       createdAt: new Date(createdAt),
       boutique: { connect: { id: boutiqueId } },
+      items: {
+        create: [
+          {
+            productName: item,
+            quantity,
+            unitPrice,
+          },
+        ],
+      },
     };
     const calls: Prisma.CallCreateWithoutOrderInput[] = [];
 

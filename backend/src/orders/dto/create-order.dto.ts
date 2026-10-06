@@ -1,14 +1,18 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
-  IsInt,
+  ArrayMinSize,
+  IsArray,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
   Matches,
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { CreateOrderItemDto } from './create-order-item.dto';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -26,20 +30,16 @@ export class CreateOrderDto {
   })
   phone: string;
 
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(200)
-  item: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemDto)
+  items: CreateOrderItemDto[];
 
-  @IsInt()
-  @Min(1)
-  @Max(1000)
-  quantity: number;
-
-  /** Order value in TND. */
+  /** Order total value in TND. Calculated automatically if omitted. */
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0)
   @Max(1_000_000)
-  total: number;
+  total?: number;
 }

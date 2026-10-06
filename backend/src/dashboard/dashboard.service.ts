@@ -87,6 +87,7 @@ export class DashboardService {
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: {
+          items: true,
           calls: {
             where: { status: 'pending' },
             select: { id: true },

@@ -7,16 +7,23 @@ export type OrderStatus = "pending" | "confirmed" | "cancelled";
 export type CallStatus = "pending" | "confirmed" | "failed" | "no_answer";
 export type CallRange = "today" | "7d" | "30d" | "all";
 
+export interface OrderItem {
+  id: number;
+  orderId: number;
+  productName: string;
+  quantity: number;
+  unitPrice: string;
+}
+
 export interface Order {
   id: number;
   customer: string;
   phone: string;
-  item: string;
-  quantity: number;
   /** TND, serialized as a decimal string. */
   total: string;
   status: OrderStatus;
   createdAt: string;
+  items?: OrderItem[];
 }
 
 export interface TranscriptLine {
@@ -156,6 +163,8 @@ export interface User {
   themeMode: ThemeMode;
   /** Null until the address is confirmed through the emailed link; the app stays closed until then. */
   emailVerifiedAt: string | null;
+  /** Ordely team member: can open the internal back office (/admin). */
+  isPlatformAdmin: boolean;
   createdAt: string;
 }
 
@@ -199,7 +208,7 @@ const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:3001/api";
  * (backend/src/auth/allow-unverified.decorator.ts). */
 const EMAIL_NOT_VERIFIED = "Email address not verified";
 
-async function send(
+export async function send(
   path: string,
   init: RequestInit | undefined,
   auth: boolean,
@@ -242,7 +251,7 @@ async function send(
   return res;
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   init?: RequestInit,
   // `token` stands in for the session cookie, e.g. right after sign-up in the same request.
@@ -374,15 +383,21 @@ completeOnboarding: () =>
     request<Order[]>(`/orders${status ? `?status=${status}` : ""}`),
   getOrder: (id: number) =>
     request<Order & { calls: Call[] }>(`/orders/${id}`),
-  createOrder: (
-    data: Pick<Order, "customer" | "phone" | "item" | "quantity"> & { total: number },
-  ) =>
+  createOrder: (data: {
+    customer: string;
+    phone: string;
+    items: { productName: string; quantity: number; unitPrice?: number }[];
+    total?: number;
+  }) =>
     request<Order>("/orders", { method: "POST", body: JSON.stringify(data) }),
   updateOrder: (
     id: number,
-    data: Partial<
-      Pick<Order, "status" | "customer" | "phone" | "item" | "quantity"> & { total: number }
-    >,
+    data: Partial<{
+      status: OrderStatus;
+      customer: string;
+      phone: string;
+      total: number;
+    }>,
   ) =>
     request<Order>(`/orders/${id}`, {
       method: "PATCH",

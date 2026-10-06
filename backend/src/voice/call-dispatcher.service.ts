@@ -41,6 +41,9 @@ export class CallDispatcherService {
         order: {
           include: {
             boutique: true,
+            items: {
+              select: { productName: true, quantity: true },
+            },
           },
         },
       },
@@ -78,8 +81,13 @@ export class CallDispatcherService {
       scenario: {
         orderRef: `#${call.order.id}`,
         customer: call.order.customer,
-        item: call.order.item,
-        quantity: call.order.quantity,
+        item: call.order.items
+          .map(({ productName, quantity }) => `${productName} x${quantity}`)
+          .join(', '),
+        quantity: call.order.items.reduce(
+          (sum, item) => sum + item.quantity,
+          0,
+        ),
         total: `${Number(call.order.total).toFixed(3)} TND`,
         language: preferredLanguage,
       },

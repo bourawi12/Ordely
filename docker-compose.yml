@@ -77,6 +77,12 @@ services:
       INTERNAL_AGENT_TOKEN: ${INTERNAL_AGENT_TOKEN:-dev-test-token}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       ORDELY_CALLBACK_SECRET: ${ORDELY_CALLBACK_SECRET:-dev-test-token}
+      # Internal back office (/admin): this account gets access at startup.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Back office unit economics: estimated telephony + AI cost, in TND.
+      COST_PER_MINUTE: ${COST_PER_MINUTE:-0.35}
+      COST_PER_CALL: ${COST_PER_CALL:-0.02}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     depends_on:

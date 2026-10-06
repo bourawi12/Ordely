@@ -56,6 +56,7 @@ export class AuthGuard implements CanActivate {
         emailVerifiedAt: true,
         boutiqueId: true,
         passwordChangedAt: true,
+        isPlatformAdmin: true,
       },
     });
     // A password reset ends every session opened before it.
@@ -73,7 +74,11 @@ export class AuthGuard implements CanActivate {
       throw new ForbiddenException(EMAIL_NOT_VERIFIED);
     }
 
-    request.user = { ...payload, boutiqueId: user.boutiqueId };
+    request.user = {
+      ...payload,
+      boutiqueId: user.boutiqueId,
+      isPlatformAdmin: user.isPlatformAdmin,
+    };
     return true;
   }
 }

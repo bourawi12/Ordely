@@ -1,10 +1,12 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
+  const prismaTransaction = jest.fn();
   const order = {
     findMany: jest.fn(),
     findFirst: jest.fn(),
@@ -12,7 +14,6 @@ describe('OrdersService', () => {
     update: jest.fn(),
     deleteMany: jest.fn(),
     count: jest.fn(),
-    createMany: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -20,7 +21,21 @@ describe('OrdersService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         OrdersService,
-        { provide: PrismaService, useValue: { order } },
+        {
+          provide: PrismaService,
+          useValue: {
+            order,
+            $transaction: prismaTransaction,
+          },
+        },
+        {
+          provide: RealtimeService,
+          useValue: {
+            emitOrderCreated: jest.fn(),
+            emitOrderStatusChanged: jest.fn(),
+            emitCallStatusChanged: jest.fn(),
+          },
+        },
       ],
     }).compile();
     service = moduleRef.get(OrdersService);
@@ -31,6 +46,7 @@ describe('OrdersService', () => {
     await service.findAll(7);
     expect(order.findMany).toHaveBeenCalledWith({
       where: { boutiqueId: 7 },
+      include: { items: true },
       orderBy: { id: 'desc' },
     });
   });
@@ -39,14 +55,33 @@ describe('OrdersService', () => {
     const dto = {
       customer: 'Ada',
       phone: '+216 22 000 000',
-      item: 'Coffee',
-      quantity: 2,
+      items: [{ productName: 'Coffee', quantity: 2, unitPrice: 6.25 }],
       total: 12.5,
     };
-    order.create.mockResolvedValue({ id: 1, status: 'pending', ...dto });
+    order.create.mockResolvedValue({
+      id: 1,
+      status: 'pending',
+      createdAt: new Date(),
+      ...dto,
+    });
     await expect(service.create(7, dto)).resolves.toMatchObject({ id: 1 });
     expect(order.create).toHaveBeenCalledWith({
-      data: { ...dto, boutiqueId: 7 },
+      data: {
+        customer: 'Ada',
+        phone: '+216 22 000 000',
+        total: 12.5,
+        boutiqueId: 7,
+        items: {
+          create: [
+            {
+              productName: 'Coffee',
+              quantity: 2,
+              unitPrice: 6.25,
+            },
+          ],
+        },
+      },
+      include: { items: true },
     });
   });
 
@@ -54,14 +89,15 @@ describe('OrdersService', () => {
     order.count.mockResolvedValue(1);
     order.update.mockResolvedValue({ id: 1, customer: 'Bob' });
     await expect(
-      service.update(7, 1, { customer: 'Bob', quantity: 3 }),
+      service.update(7, 1, { customer: 'Bob' }),
     ).resolves.toMatchObject({ customer: 'Bob' });
     expect(order.count).toHaveBeenCalledWith({
       where: { id: 1, boutiqueId: 7 },
     });
     expect(order.update).toHaveBeenCalledWith({
       where: { id: 1 },
-      data: { customer: 'Bob', quantity: 3 },
+      data: { customer: 'Bob' },
+      include: { items: true },
     });
   });
 
@@ -84,7 +120,7 @@ describe('OrdersService', () => {
   });
 
   it('imports valid CSV rows and reports invalid ones', async () => {
-    order.createMany.mockResolvedValue({ count: 1 });
+    prismaTransaction.mockResolvedValue([]);
     const csvContent =
       'customer,phone,item,quantity,total,status\n' +
       'John Doe,+216 22 111 222,Robe Silk,2,120.5,pending\n' +
@@ -97,18 +133,21 @@ describe('OrdersService', () => {
     expect(result.failed).toBe(1);
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0].row).toBe(3);
-    expect(order.createMany).toHaveBeenCalledWith({
-      data: [
-        {
-          boutiqueId: 7,
-          customer: 'John Doe',
-          phone: '+216 22 111 222',
-          item: 'Robe Silk',
-          quantity: 2,
-          total: 120.5,
-        },
-      ],
-    });
+    expect(prismaTransaction).toHaveBeenCalled();
+  });
+
+  it('imports multi-item CSV rows with semicolon-separated items and quantities', async () => {
+    prismaTransaction.mockResolvedValue([]);
+    const csvContent =
+      'customer,phone,item,quantity,total\n' +
+      'Sonia Ben Ali,+216 22 111 222,Robe en soie Rouge; Écharpe satinée Beige; Sac à main Noir,2; 1; 1,240.5\n';
+    const fileBuffer = Buffer.from(csvContent, 'utf-8');
+
+    const result = await service.importCsv(7, fileBuffer);
+
+    expect(result.imported).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(prismaTransaction).toHaveBeenCalled();
   });
 });
 
