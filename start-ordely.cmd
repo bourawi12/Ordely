@@ -26,26 +26,55 @@ exit /b 1
 :engine_ready
 echo Docker engine is ready.
 
-REM 2) Bring the stack up
-echo Starting Ordely containers...
-REM Start only supporting services in Docker.
-docker compose up -d db minio mailpit
+REM 2) Install dependencies from the lockfiles.
+echo Installing backend dependencies...
+pushd "%~dp0backend"
+call npm install --no-audit --no-fund
+if errorlevel 1 (
+    echo Backend dependency installation failed.
+    popd
+    pause
+    exit /b 1
+)
+popd
+
+echo Installing frontend dependencies...
+pushd "%~dp0frontend"
+call npm install --no-audit --no-fund
+if errorlevel 1 (
+    echo Frontend dependency installation failed.
+    popd
+    pause
+    exit /b 1
+)
+popd
+
+REM 3) Start supporting services and wait until they are ready.
+echo Starting Ordely infrastructure...
+docker compose up -d --wait db minio mailpit
 if errorlevel 1 (
     echo Could not start Docker infrastructure.
     pause
     exit /b 1
 )
 
-REM Run the app processes on Windows.
-start "Ordely Backend" /D "%~dp0backend" cmd /k "npm run start:dev"
-start "Ordely Frontend" /D "%~dp0frontend" cmd /k "npm run dev"
+REM 4) Apply pending database migrations before starting the backend.
+echo Applying database migrations...
+pushd "%~dp0backend"
+call npm run prisma:deploy
 if errorlevel 1 (
-    echo docker compose up failed.
+    echo Database migrations failed. The app servers were not started.
+    popd
     pause
     exit /b 1
 )
+popd
 
-REM 3) Wait for the backend health endpoint
+REM Run the app processes on Windows.
+start "Ordely Backend" /D "%~dp0backend" cmd /k "npm run start:dev"
+start "Ordely Frontend" /D "%~dp0frontend" cmd /k "npm run dev"
+
+REM 5) Wait for the backend health endpoint
 echo Waiting for the backend on http://localhost:3001/api/health ...
 set /a tries=0
 :wait_backend

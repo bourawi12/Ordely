@@ -104,6 +104,12 @@ export class RingioAdapter implements VoiceAgentClient, OnModuleDestroy {
         failureReported = true;
         void this.reportTaskFailure(task.taskId, message);
       };
+      let callEnded = false;
+      child.on('message', (message: { type?: string; phase?: string }) => {
+        if (message?.type === 'agent-status' && message.phase === 'ended') {
+          callEnded = true;
+        }
+      });
       child.on('error', (error) => {
         this.logger.error(
           `Could not start voice task ${task.taskId}: ${error.message}`,
@@ -112,7 +118,7 @@ export class RingioAdapter implements VoiceAgentClient, OnModuleDestroy {
         this.clearChild(child);
       });
       child.on('exit', (code) => {
-        if (code !== 0) {
+        if (code !== 0 && !callEnded) {
           this.logger.warn(
             `Voice task ${task.taskId} exited with code ${code}.`,
           );

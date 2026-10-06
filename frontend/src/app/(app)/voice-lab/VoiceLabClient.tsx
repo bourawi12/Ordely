@@ -112,7 +112,7 @@ export default function VoiceLabClient({
     if (!isPolling || !selectedId) return;
 
     const interval = setInterval(() => {
-      refreshSelectedCall(selectedId);
+      refreshSelectedCall(selectedId).catch(() => {});
     }, 2500);
 
     return () => clearInterval(interval);

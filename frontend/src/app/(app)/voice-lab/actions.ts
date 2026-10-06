@@ -35,11 +35,17 @@ export async function createTestOrderAndQueueAction(data: {
   autoDispatch?: boolean;
 }): Promise<{ success: boolean; callId?: number; error?: string }> {
   try {
+    const quantity = data.quantity > 0 ? data.quantity : 1;
+
     const order = await api.createOrder({
       customer: data.customer.trim() || "Test Customer",
       phone: data.phone.trim() || "+216 99 123 456",
-      item: data.item.trim() || "Pack Découverte Ordely",
-      quantity: data.quantity > 0 ? data.quantity : 1,
+      items: [
+        {
+          productName: data.item.trim() || "Pack Découverte Ordely",
+          quantity,
+        },
+      ],
       total: data.total > 0 ? data.total : 49.9,
     });
 

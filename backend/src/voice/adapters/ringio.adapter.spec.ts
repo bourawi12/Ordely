@@ -167,6 +167,25 @@ describe('RingioAdapter', () => {
     );
   });
 
+  it('does not report a completed call as failed when the worker exits nonzero', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+    await adapter.startTask(sampleTask);
+    const messageHandler = child.on.mock.calls.find(
+      ([event]) => event === 'message',
+    )?.[1];
+    const exitHandler = child.on.mock.calls.find(
+      ([event]) => event === 'exit',
+    )?.[1];
+
+    messageHandler({ type: 'agent-status', phase: 'ended' });
+    exitHandler(2147483651);
+
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      'http://127.0.0.1:3001/api/internal/voice/result',
+      expect.anything(),
+    );
+  });
+
   it('stops the child worker when the Nest module shuts down', async () => {
     await adapter.startTask(sampleTask);
 
