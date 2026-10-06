@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-alpine AS base
-# Prisma's query engine needs OpenSSL.
-RUN apk add --no-cache openssl
+FROM node:22-bookworm-slim AS base
+# Prisma's query engine needs OpenSSL, and the healthcheck uses wget.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl wget && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 FROM base AS deps

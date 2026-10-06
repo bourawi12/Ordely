@@ -57,11 +57,63 @@ model Call {
   recordingUrl    String?
   createdAt       DateTime @default(now()) @db.Timestamptz(6)
 
+  /// UUID task ID for voice-agent correlation
+  taskId          String?   @unique @db.VarChar(36)
+  /// Provider's call ID (Ringio UUID), stored as correlation data
+  providerCallId  String?   @db.VarChar(100)
+  /// Transport phase: dispatched, ringing, connected, ended, error, etc.
+  transportPhase  String?   @db.VarChar(20)
+  /// Business disposition from the agent: confirmed, declined, etc.
+  disposition     String?   @db.VarChar(20)
+  /// Human-readable failure reason shown in the dashboard
+  failureReason   String?   @db.VarChar(500)
+  /// When the call was dispatched to the voice agent
+  dispatchedAt    DateTime? @db.Timestamptz(6)
+  /// When the provider reported the call ended
+  completedAt     DateTime? @db.Timestamptz(6)
+  /// Marks this as a simulated test call
+  isSimulated     Boolean   @default(true)
+
+  recordings        CallRecording[]
+  transcriptEntries CallTranscriptEntry[]
+
   @@index([orderId])
   @@index([status])
   @@index([createdAt])
+  @@index([taskId])
   @@map("calls")
 }
+
+/// Per-speaker audio recording stored in object storage.
+model CallRecording {
+  id         Int      @id @default(autoincrement())
+  callId     Int
+  call       Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  speaker    String   @db.VarChar(20)
+  objectKey  String   @db.VarChar(500)
+  sizeBytes  Int?
+  durationMs Int?
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([callId, speaker])
+  @@map("call_recordings")
+}
+
+/// Individual transcript line, ordered by sequence.
+model CallTranscriptEntry {
+  id        Int      @id @default(autoincrement())
+  callId    Int
+  call      Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  sequence  Int
+  speaker   String   @db.VarChar(20)
+  text      String
+  timestamp DateTime @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([callId, sequence])
+  @@map("call_transcript_entries")
+}
+
 
 model User {
   id                     Int       @id @default(autoincrement())

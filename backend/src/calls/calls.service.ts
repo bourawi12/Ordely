@@ -113,7 +113,13 @@ export class CallsService {
   async findOne(boutiqueId: number, id: number) {
     const call = await this.prisma.call.findFirst({
       where: { id, order: { boutiqueId } },
-      include: withOrder,
+      include: {
+        ...withOrder,
+        recordings: true,
+        transcriptEntries: {
+          orderBy: { sequence: 'asc' },
+        },
+      },
     });
     if (!call) {
       throw new NotFoundException(`Call ${id} not found`);
@@ -125,44 +131,40 @@ export class CallsService {
   }
 
   /** Records the outcome of a call (status, duration, transcript, …). */
-async update(
-  boutiqueId: number,
-  id: number,
-  dto: UpdateCallDto,
-) {
-  await this.findOne(boutiqueId, id);
+  async update(boutiqueId: number, id: number, dto: UpdateCallDto) {
+    await this.findOne(boutiqueId, id);
 
   const updated = await this.prisma.call.update({
-    where: { id },
-    data: {
-      status: dto.status,
-      ...(dto.durationSeconds !== undefined && {
-        durationSeconds: dto.durationSeconds,
-      }),
-      ...(dto.language !== undefined && {
-        language: dto.language,
-      }),
-      ...(dto.transcript !== undefined && {
-        transcript: dto.transcript as unknown as Prisma.InputJsonValue,
-      }),
-      ...(dto.recordingUrl !== undefined && {
-        recordingUrl: dto.recordingUrl,
-      }),
-    },
-    include: withOrder,
-  });
-
-  if (dto.status) {
-    this.realtimeService.emitCallStatusChanged(boutiqueId, {
-      callId: updated.id,
-      orderId: updated.orderId,
-      status: updated.status,
-      updatedAt: updated.createdAt.toISOString(),
+      where: { id },
+      data: {
+        status: dto.status,
+        ...(dto.durationSeconds !== undefined && {
+          durationSeconds: dto.durationSeconds,
+        }),
+        ...(dto.language !== undefined && {
+          language: dto.language,
+        }),
+        ...(dto.transcript !== undefined && {
+          transcript: dto.transcript as unknown as Prisma.InputJsonValue,
+        }),
+        ...(dto.recordingUrl !== undefined && {
+          recordingUrl: dto.recordingUrl,
+        }),
+      },
+      include: withOrder,
     });
-  }
 
-  return updated;
-}
+    if (dto.status) {
+      this.realtimeService.emitCallStatusChanged(boutiqueId, {
+        callId: updated.id,
+        orderId: updated.orderId,
+        status: updated.status,
+        updatedAt: updated.createdAt.toISOString(),
+      });
+    }
+
+    return updated;
+  }
 
   /** Queues a confirmation call for a pending order. */
   async queue(boutiqueId: number, orderId: number) {

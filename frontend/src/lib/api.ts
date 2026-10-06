@@ -31,6 +31,26 @@ export interface TranscriptLine {
   text: string;
 }
 
+export interface CallRecording {
+  id: number;
+  callId: number;
+  speaker: string;
+  objectKey: string;
+  sizeBytes: number | null;
+  durationMs: number | null;
+  createdAt: string;
+}
+
+export interface CallTranscriptEntry {
+  id: number;
+  callId: number;
+  sequence: number;
+  speaker: "agent" | "customer";
+  text: string;
+  timestamp: string;
+  createdAt: string;
+}
+
 export interface Call {
   id: number;
   orderId: number;
@@ -41,6 +61,16 @@ export interface Call {
   transcript: TranscriptLine[] | null;
   recordingUrl: string | null;
   createdAt: string;
+  taskId?: string | null;
+  providerCallId?: string | null;
+  transportPhase?: string | null;
+  disposition?: string | null;
+  failureReason?: string | null;
+  dispatchedAt?: string | null;
+  completedAt?: string | null;
+  isSimulated?: boolean;
+  recordings?: CallRecording[];
+  transcriptEntries?: CallTranscriptEntry[];
 }
 
 export type CallWithOrder = Call & {
@@ -60,6 +90,7 @@ export interface CallFilters {
   search?: string;
   range?: CallRange;
   page?: number;
+  pageSize?: number;
 }
 
 export interface Metric {
@@ -341,6 +372,10 @@ completeOnboarding: () =>
     request<Call>("/calls", { method: "POST", body: JSON.stringify({ orderId }) }),
   queueAllPending: () =>
     request<{ queued: number }>("/calls/queue-pending", { method: "POST" }),
+  dispatchCall: (id: number) =>
+    request<Call>(`/calls/${id}/dispatch`, { method: "POST" }),
+  getRecordingUrl: (id: number, speaker: string) =>
+    request<{ url: string }>(`/calls/${id}/recordings/${speaker}`),
   /** Upload a CSV file to bulk-import orders. */
   importOrders: (form: FormData) =>
     request<ImportResult>("/orders/import", { method: "POST", body: form }),
