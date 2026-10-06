@@ -9,10 +9,15 @@ import { CallCallbackGuard } from './callbacks/call-callback.guard';
 import { CallCallbackService } from './callbacks/call-callback.service';
 import { CallDispatcherService } from './call-dispatcher.service';
 import { VOICE_AGENT_CLIENT } from './voice-agent-client.interface';
+import { VoiceController } from './voice.controller';
 
 @Module({
   imports: [PrismaModule, StorageModule],
-  controllers: [CallCallbackController, CallArtifactController],
+  controllers: [
+    CallCallbackController,
+    CallArtifactController,
+    VoiceController,
+  ],
   providers: [
     CallDispatcherService,
     CallCallbackService,

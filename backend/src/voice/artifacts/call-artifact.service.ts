@@ -13,7 +13,148 @@ export class CallArtifactService {
     private readonly storage: StorageService,
   ) {}
 
-  async saveTranscript(entry: TranscriptEntry) {
+  async listTranscripts(boutiqueId: number, callId: number) {
+    const call = await this.prisma.call.findFirst({
+      where: {
+        id: callId,
+        order: { boutiqueId },
+      },
+      include: {
+        transcriptEntries: {
+          orderBy: { sequence: 'asc' },
+        },
+      },
+    });
+
+    if (!call) {
+      throw new NotFoundException(
+        `Call ${callId} not found for boutique ${boutiqueId}`,
+      );
+    }
+
+    return call.transcriptEntries;
+  }
+
+  async listAssets(boutiqueId: number, callId: number) {
+    const call = await this.prisma.call.findFirst({
+      where: {
+        id: callId,
+        order: { boutiqueId },
+      },
+      include: {
+        recordings: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!call) {
+      throw new NotFoundException(
+        `Call ${callId} not found for boutique ${boutiqueId}`,
+      );
+    }
+
+    return call.recordings;
+  }
+
+  async saveAsset(
+    boutiqueId: number,
+    callId: number,
+    asset: {
+      speaker: string;
+      fileName: string;
+      contentType: string;
+      bytes?: number;
+      durationMs?: number;
+      sampleRate?: number;
+      channelCount?: number;
+    },
+  ) {
+    const call = await this.prisma.call.findFirst({
+      where: {
+        id: callId,
+        order: { boutiqueId },
+      },
+      include: { order: { select: { boutiqueId: true } } },
+    });
+
+    if (!call) {
+      throw new NotFoundException(
+        `Call ${callId} not found for boutique ${boutiqueId}`,
+      );
+    }
+
+    const speaker = asset.speaker === 'customer' ? 'customer' : 'agent';
+    const objectKey = `calls/${call.order.boutiqueId}/${call.id}/${speaker}.wav`;
+
+    return this.prisma.callRecording.upsert({
+      where: {
+        callId_speaker: {
+          callId: call.id,
+          speaker,
+        },
+      },
+      update: {
+        objectKey,
+        sizeBytes: asset.bytes ?? null,
+        durationMs: asset.durationMs ?? null,
+      },
+      create: {
+        callId: call.id,
+        speaker,
+        objectKey,
+        sizeBytes: asset.bytes ?? null,
+        durationMs: asset.durationMs ?? null,
+      },
+    });
+  }
+
+  async saveTranscript(entry: TranscriptEntry): Promise<unknown>;
+  async saveTranscript(
+    boutiqueId: number,
+    callId: number,
+    entry: Partial<TranscriptEntry>,
+  ): Promise<unknown>;
+  async saveTranscript(
+    entryOrBoutiqueId: TranscriptEntry | number,
+    callId?: number,
+    entry?: Partial<TranscriptEntry>,
+  ) {
+    if (typeof entryOrBoutiqueId === 'number') {
+      const boutiqueId = entryOrBoutiqueId;
+      const call = await this.prisma.call.findFirst({
+        where: {
+          id: callId,
+          order: { boutiqueId },
+        },
+      });
+
+      if (!call || !callId) {
+        throw new NotFoundException(
+          `Call ${callId} not found for boutique ${boutiqueId}`,
+        );
+      }
+
+      const normalizedEntry: TranscriptEntry = {
+        taskId: call.taskId || `call-${call.id}`,
+        sequence:
+          typeof entry?.sequence === 'number'
+            ? entry.sequence
+            : (await this.prisma.callTranscriptEntry.count({
+                where: { callId: call.id },
+              })) + 1,
+        speaker: entry?.speaker === 'customer' ? 'customer' : 'agent',
+        text: String(entry?.text ?? '').trim(),
+        timestamp: entry?.timestamp ?? new Date().toISOString(),
+      };
+
+      return this.persistTranscript(normalizedEntry);
+    }
+
+    return this.persistTranscript(entryOrBoutiqueId);
+  }
+
+  private async persistTranscript(entry: TranscriptEntry) {
     const call = await this.prisma.call.findUnique({
       where: { taskId: entry.taskId },
     });
@@ -43,7 +184,6 @@ export class CallArtifactService {
       },
     });
 
-    // Also update legacy JSON transcript array for backwards compatibility
     const allEntries = await this.prisma.callTranscriptEntry.findMany({
       where: { callId: call.id },
       orderBy: { sequence: 'asc' },

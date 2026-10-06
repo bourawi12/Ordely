@@ -72,8 +72,10 @@ services:
       MAIL_FROM: ${MAIL_FROM:-Ordely <no-reply@ordely.tn>}
       # Where the links in emails point: the address users open the app at.
       APP_URL: ${APP_URL:-http://localhost:3200}
-      VOICE_AGENT_BASE_URL: ${VOICE_AGENT_BASE_URL:-http://host.docker.internal:4200}
-      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-dev-test-token}
+      CALL_SERVER_URL: ${CALL_SERVER_URL:-http://host.docker.internal:4100}
+      CALL_SERVER_FALLBACK_URL: ${CALL_SERVER_FALLBACK_URL:-https://voip-ringio-prototype.vercel.app}
+      INTERNAL_AGENT_TOKEN: ${INTERNAL_AGENT_TOKEN:-dev-test-token}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       ORDELY_CALLBACK_SECRET: ${ORDELY_CALLBACK_SECRET:-dev-test-token}
     ports:
       - "${BACKEND_PORT:-3001}:3001"

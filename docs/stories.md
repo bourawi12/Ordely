@@ -12,14 +12,14 @@
 ### Acceptance criteria
 - [ ] Provider-neutral `VoiceAgentClient` port defined with DIP/LSP so Ordely has zero WebRTC or Gemini dependencies.
 - [ ] Database schema migration adds `taskId`, `providerCallId`, `transportPhase`, `disposition`, `failureReason`, and relations for `CallRecording` and `CallTranscriptEntry` without breaking existing `Call` fields.
-- [ ] `CallDispatcherService` dispatches pending calls to the agent via `RingioAdapter` with idempotency.
+- [ ] `CallDispatcherService` dispatches pending calls through an Ordely-owned worker that connects directly to the Ringio VoIP server, with idempotency.
 - [ ] Internal authenticated callback endpoints receive lifecycle events (`ringing`, `connected`, `ended`, `error`), transcript lines, and structured dispositions.
 - [ ] Finalized WAV audio files are stored via Ordely's `StorageService` in MinIO, tenant-scoped, and served via short-lived signed URLs.
 - [ ] Human review gate preserved: automated calls never auto-confirm an order without explicit review.
 - [ ] Tests for dispatch, adapter, callbacks, and artifact storage pass without regressions.
 
 ### Dependencies
-- Existing `CallsModule`, `StorageService`, and Ringio `mock-external-service`.
+- Existing `CallsModule`, `StorageService`, and Ringio `voip-call-server`; the agent runtime is hosted in Ordely.
 
 ### Agentic notes
 - Ordely `Call.id` is integer; Ringio `callId` is UUID. Do not alter Ordely primary key.

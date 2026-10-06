@@ -28,7 +28,17 @@ echo Docker engine is ready.
 
 REM 2) Bring the stack up
 echo Starting Ordely containers...
-docker compose up -d
+REM Start only supporting services in Docker.
+docker compose up -d db minio mailpit
+if errorlevel 1 (
+    echo Could not start Docker infrastructure.
+    pause
+    exit /b 1
+)
+
+REM Run the app processes on Windows.
+start "Ordely Backend" /D "%~dp0backend" cmd /k "npm run start:dev"
+start "Ordely Frontend" /D "%~dp0frontend" cmd /k "npm run dev"
 if errorlevel 1 (
     echo docker compose up failed.
     pause

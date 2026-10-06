@@ -7,7 +7,7 @@ Branch: `feature/s01-voice-integration`
 Research: `docs/research/s01-voice-integration.md` — read it first; this plan does not repeat it.
 
 ## Target story
-Connect Ordely's confirmation call queue to Ringio's simulated Gemini voice agent via a clean DIP/SOLID port-and-adapter architecture, ensuring durable correlation, idempotent callbacks, transcript persistence, and private per-speaker audio storage without carrier/telephony dependencies.
+Connect Ordely's confirmation call queue to its own Gemini/WebRTC worker, which connects directly to Ringio's VoIP server on port 4100. Keep durable correlation, authenticated callbacks, transcript persistence, and private per-speaker audio storage without carrier/telephony dependencies. The separate Ringio mock-external-service is not part of the Ordely runtime path.
 
 ## Tasks (ordered)
 
@@ -21,11 +21,11 @@ Connect Ordely's confirmation call queue to Ringio's simulated Gemini voice agen
 - [x] 2.2 Generate Prisma client and create migration.
 - [x] 2.3 Extend `CallsService.findOne()` to include `recordings` and `transcriptEntries`.
 
-### Task 3: Call Dispatcher & Ringio Adapter (OCP / DIP)
-- [x] 3.1 Create `backend/src/voice/adapters/ringio.adapter.ts` implementing `VoiceAgentClient`.
+### Task 3: Call Dispatcher & Voice Worker Adapter (OCP / DIP)
+- [x] 3.1 Implement `RingioAdapter` to launch the Ordely-owned voice worker as a child process.
 - [x] 3.2 Create `backend/src/voice/call-dispatcher.service.ts` to dispatch pending calls with concurrency bound = 1.
 - [x] 3.3 Create `backend/src/voice/voice.module.ts` wiring the dispatcher and adapter into `app.module.ts`.
-- [x] 3.4 Add unit tests for `CallDispatcherService` with `FakeVoiceAgentClient`.
+- [x] 3.4 Test worker task context, duplicate rejection, graceful stop, and failure callbacks.
 
 ### Task 4: Internal Callback & Artifact Endpoints (SRP / Security)
 - [x] 4.1 Create `backend/src/voice/callbacks/call-callback.guard.ts` (Bearer token auth for internal services).
@@ -33,10 +33,10 @@ Connect Ordely's confirmation call queue to Ringio's simulated Gemini voice agen
 - [x] 4.3 Create `backend/src/voice/artifacts/call-artifact.service.ts` & `call-artifact.controller.ts` for saving transcript entries and WAV files into `StorageService`.
 - [x] 4.4 Add unit tests for callback reconciliation and artifact uploads.
 
-### Task 5: Ringio Agent Control API & Callback Client
-- [x] 5.1 In `Ringio/mock-external-service/mock-service.js`, add authenticated `POST /api/task/start`, `POST /api/task/stop`, `GET /api/task/status`, `GET /api/health`.
-- [x] 5.2 Create `Ringio/mock-external-service/ordelyCallbackClient.js` to post lifecycle events, transcripts, and finalized audio to Ordely.
-- [x] 5.3 Wire task context propagation in `agent.js` and `voiceCallAgent.js`.
+### Task 5: Ordely-Owned Voice Runtime
+- [x] 5.1 Host the Gemini/WebRTC worker modules under `backend/src/voice/runtime/`; Nest launches the JS entrypoint as a child and does not import media modules.
+- [x] 5.2 Connect the worker directly to `CALL_SERVER_URL` and post authenticated lifecycle events, transcripts, and finalized WAV files to Ordely.
+- [x] 5.3 Pass the synthetic order scenario to Gemini and keep ordinary call completion in the human-review state.
 
 ### Task 6: End-to-End Verification & Verification Record
 - [x] 6.1 Run backend unit tests and linting.
@@ -61,9 +61,9 @@ The contract boundaries:
 - `backend/src/app.module.ts`
 - `backend/src/calls/calls.service.ts`
 - `backend/src/voice/*` (new module)
-- `Ringio/mock-external-service/mock-service.js`
-- `Ringio/mock-external-service/ordelyCallbackClient.js`
-- `Ringio/mock-external-service/voiceCallAgent.js`
+- `backend/src/voice/runtime/*`
+- `backend/package.json` and `backend/package-lock.json`
+- `backend/Dockerfile`, `backend/nest-cli.json`, `docker-compose.yml`, and backend env example
 - `docs/verif/s01-voice-integration.md`
 
 ## Test strategy
