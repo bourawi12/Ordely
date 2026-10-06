@@ -115,6 +115,9 @@ export class AuthService {
             boutiqueId: boutique.id,
             accentColor: dto.accentColor ?? null,
             themeMode: dto.themeMode ?? 'system',
+            acceptedTermsAt: new Date(),
+            termsVersion: dto.termsVersion ?? '1.0',
+            privacyVersion: dto.privacyVersion ?? '1.0',
             ...verify.data,
           },
         });

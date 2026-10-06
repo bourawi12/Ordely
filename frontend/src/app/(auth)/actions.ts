@@ -68,6 +68,16 @@ export async function register(
     return { error: "Passwords do not match.", email, name };
   }
 
+  const acceptedTermsRaw = formData.get("acceptedTerms");
+  const acceptedTerms = acceptedTermsRaw === "true" || acceptedTermsRaw === "on" || acceptedTermsRaw === "1";
+  if (!acceptedTerms) {
+    return {
+      error: "You must accept the Terms & Conditions and Privacy Policy to create an account.",
+      email,
+      name,
+    };
+  }
+
   // Look chosen on the first sign-up screen; anything unexpected falls back to the defaults.
   const accent = String(formData.get("accentColor") ?? "");
   const theme = String(formData.get("themeMode") ?? "");
@@ -82,6 +92,9 @@ export async function register(
       themeMode: THEME_MODES.includes(theme as ThemeMode)
         ? (theme as ThemeMode)
         : undefined,
+      acceptedTerms: true,
+      termsVersion: "1.0",
+      privacyVersion: "1.0",
     });
     if (avatar instanceof File && avatar.size > 0) {
       // The account exists either way: a refused picture can be added later in Settings.

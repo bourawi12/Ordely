@@ -259,6 +259,9 @@ export const api = {
     password: string;
     accentColor?: string;
     themeMode?: ThemeMode;
+    acceptedTerms: boolean;
+    termsVersion?: string;
+    privacyVersion?: string;
   }) =>
     request<AuthResult>(
       "/auth/register",

@@ -87,7 +87,7 @@
   font-weight: 500;
 }
 
-.form input {
+.form input:not([type="checkbox"]) {
   padding: 0.7rem 0.85rem;
   border: 1.5px solid var(--line);
   border-radius: 10px;
@@ -98,7 +98,7 @@
     box-shadow 0.15s ease;
 }
 
-.form input:focus {
+.form input:not([type="checkbox"]):focus {
   outline: none;
   border-color: var(--blue);
   box-shadow: 0 0 0 4px rgba(30, 99, 255, 0.15);
@@ -125,6 +125,45 @@
   background: var(--blue);
   color: #fff;
   font-weight: 600;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.termsCheckboxLabel {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+  cursor: pointer;
+  color: var(--navy);
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.termsCheckboxLabel a {
+  color: var(--blue);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.termsCheckboxLabel input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  box-shadow: none;
+  flex-shrink: 0;
+  accent-color: var(--blue);
+  cursor: pointer;
 }
 
 .error,
