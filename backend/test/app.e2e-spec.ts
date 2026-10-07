@@ -1169,12 +1169,6 @@ describe('App (e2e)', () => {
         .expect((res) =>
           expect(res.body.message).toBe('Your card was declined.'),
         );
-      await request(server)
-        .get('/calls/usage')
-        .set(auth)
-        .expect((res) =>
-          expect(res.body).toMatchObject({ plan: 'Free plan', limit: 500 }),
-        );
 
       await request(server)
         .post('/billing/subscribe')

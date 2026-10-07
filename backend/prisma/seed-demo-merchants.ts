@@ -264,7 +264,7 @@ function profile(kind: Archetype, now: number): Profile {
       };
     }
     case 'upsell': {
-      // Free shops already near their 500 calls this month.
+      
       const monthStart =
         Date.UTC(
           new Date(now).getUTCFullYear(),

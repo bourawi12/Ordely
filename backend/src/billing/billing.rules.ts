@@ -10,7 +10,6 @@ import { Plan, planOf, PLANS } from '../admin/plans';
  * assuming about 1.3 calls per order over 30 days. No answer yet: the free plan.
  */
 const RECOMMENDED: Record<string, string> = {
-  lt20: 'free', //     < 20/day  → up to ~500 calls a month
   '20_50': 'starter', // up to ~1,500
   '50_100': 'growth', // up to ~5,000
   '100_300': 'pro', //  up to ~15,000
