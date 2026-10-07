@@ -18,6 +18,7 @@ const NAV: { href: string; label: string; icon: IconName; subtitle?: string }[] 
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/call-logs", label: "Call Logs", icon: "phoneCall", subtitle: "All outgoing confirmation calls" },
   { href: "/orders", label: "Orders", icon: "bag", subtitle: "Every order and its confirmation status" },
+  { href: "/voice-test", label: "AI Voice Agent", icon: "headset", subtitle: "Interactive PC voice call simulation" },
   { href: "/analytics", label: "Analytics", icon: "bars", subtitle: "Trends across your confirmations" },
   { href: "/integrations", label: "Integrations", icon: "plug", subtitle: "Connect your store and tools" },
   { href: "/settings", label: "Settings", icon: "settings", subtitle: "Your account" },

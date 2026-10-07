@@ -14,6 +14,7 @@ import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { StorageModule } from './storage/storage.module';
+import { VoiceModule } from './voice/voice.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { StorageModule } from './storage/storage.module';
     AnalyticsModule,
     RealtimeModule,
     AdminModule,
+    VoiceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

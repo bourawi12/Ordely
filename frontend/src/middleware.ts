@@ -24,5 +24,6 @@ export const config = {
     "/settings/:path*",
     "/onboarding/:path*",
     "/admin/:path*",
+    "/voice-test/:path*",
   ],
 };

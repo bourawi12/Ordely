@@ -78,6 +78,9 @@ services:
       # Back office unit economics: estimated telephony + AI cost, in TND.
       COST_PER_MINUTE: ${COST_PER_MINUTE:-0.35}
       COST_PER_CALL: ${COST_PER_CALL:-0.02}
+      # AI Voice Agent (optional)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     depends_on:

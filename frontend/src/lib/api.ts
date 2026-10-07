@@ -373,5 +373,6 @@ completeOnboarding: () =>
     }),
   deleteOrder: (id: number) =>
     request<void>(`/orders/${id}`, { method: "DELETE" }),
+  listVoiceOrders: () => request<Order[]>("/voice/orders"),
 };
 
