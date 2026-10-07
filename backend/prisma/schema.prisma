@@ -143,7 +143,34 @@ model Boutique {
   updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   users                 User[]
   orders                Order[]
+  payments              Payment[]
 
   @@index([createdAt])
   @@map("boutiques")
+}
+
+/// One attempt to pay for a plan, successful or not (the trail behind boutiques.plan).
+/// Never holds card data: only the brand and last four digits the provider reports.
+model Payment {
+  id            Int      @id @default(autoincrement())
+  boutiqueId    Int
+  boutique      Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  /// Plan code paid for ("starter", "growth", "pro").
+  plan          String   @db.VarChar(20)
+  /// Amount in TND (3 decimals for millimes).
+  amount        Decimal  @db.Decimal(10, 3)
+  currency      String   @default("TND") @db.VarChar(3)
+  /// "simulated" for now; a real gateway's name later.
+  provider      String   @db.VarChar(20)
+  /// "succeeded" or "failed".
+  status        String   @db.VarChar(20)
+  /// The provider's own id for the charge.
+  reference     String   @unique @db.VarChar(64)
+  cardBrand     String?  @db.VarChar(20)
+  cardLast4     String?  @db.VarChar(4)
+  failureReason String?  @db.VarChar(100)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([boutiqueId, createdAt])
+  @@map("payments")
 }

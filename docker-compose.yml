@@ -86,6 +86,8 @@ services:
       VOICE_TEST_DESTINATION: ${VOICE_TEST_DESTINATION:-}
       VOICE_MIN_CONFIDENCE: ${VOICE_MIN_CONFIDENCE:-0.8}
       VOICE_CALL_TIMEOUT_MINUTES: ${VOICE_CALL_TIMEOUT_MINUTES:-10}
+      # Plan payments. Empty: paid plans can't be bought. "simulated" is test mode (dev only).
+      PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     depends_on:

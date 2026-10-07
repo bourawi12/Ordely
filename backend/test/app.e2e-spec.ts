@@ -9,6 +9,8 @@ import { PrismaService } from './../src/prisma/prisma.service';
 // Shared secret of the voice agent callbacks, as Ringio would send it.
 const VOICE_SECRET = 'e2e-voice-callback-secret';
 process.env.VOICE_CALLBACK_SECRET = VOICE_SECRET;
+// Plan payments in test mode, as in development.
+process.env.PAYMENTS_PROVIDER = 'simulated';
 describe('App (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -1106,6 +1108,135 @@ describe('App (e2e)', () => {
         .get(`/orders/${orderId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect((res) => expect(res.body.status).toBe('confirmed'));
+    });
+  });
+
+  describe('billing (plan and payment)', () => {
+    it('recommends a plan from the daily volume, and only a successful payment starts it', async () => {
+      const server = app.getHttpServer();
+      const auth = { Authorization: `Bearer ${token}` };
+      const me = await prisma.user.findUniqueOrThrow({ where: { email } });
+
+      await request(server)
+        .patch('/boutique/details')
+        .set(auth)
+        .send({ dailyOrderVolume: '50_100' })
+        .expect(200);
+      await request(server)
+        .get('/billing/plans')
+        .set(auth)
+        .expect(200)
+        .expect((res) =>
+          expect(res.body).toMatchObject({
+            recommended: 'growth',
+            current: 'free',
+            payments: { available: true, testMode: true },
+          }),
+        );
+
+      // No plan without a payment method, an unknown card or an unknown plan.
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'growth' })
+        .expect(400);
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'growth', paymentToken: 'tok_made_up' })
+        .expect(400);
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'platinum' })
+        .expect(400);
+      // A card number is not an accepted field: it must never reach the API.
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({
+          plan: 'growth',
+          paymentToken: 'tok_test_visa',
+          cardNumber: '4242424242424242',
+        })
+        .expect(400);
+
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'growth', paymentToken: 'tok_test_declined' })
+        .expect(402)
+        .expect((res) =>
+          expect(res.body.message).toBe('Your card was declined.'),
+        );
+      await request(server)
+        .get('/calls/usage')
+        .set(auth)
+        .expect((res) =>
+          expect(res.body).toMatchObject({ plan: 'Free plan', limit: 500 }),
+        );
+
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'growth', paymentToken: 'tok_test_visa' })
+        .expect(200)
+        .expect((res) =>
+          expect(res.body).toMatchObject({
+            plan: 'growth',
+            payment: {
+              amount: 199,
+              currency: 'TND',
+              cardLast4: '4242',
+              testMode: true,
+            },
+          }),
+        );
+      await request(server)
+        .get('/calls/usage')
+        .set(auth)
+        .expect((res) =>
+          expect(res.body).toMatchObject({ plan: 'Growth plan', limit: 5000 }),
+        );
+      await request(server)
+        .get('/billing/plans')
+        .set(auth)
+        .expect((res) => expect(res.body.current).toBe('growth'));
+
+      const payments = await prisma.payment.findMany({
+        where: { boutiqueId: me.boutiqueId },
+        orderBy: { id: 'asc' },
+      });
+      expect(
+        payments.map((p) => [
+          p.status,
+          p.plan,
+          Number(p.amount),
+          p.failureReason,
+        ]),
+      ).toEqual([
+        ['failed', 'growth', 199, 'card_declined'],
+        ['succeeded', 'growth', 199, null],
+      ]);
+
+      // Back to free: the paid plan is cancelled.
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'free' })
+        .expect(200);
+      await request(server)
+        .get('/calls/usage')
+        .set(auth)
+        .expect((res) => expect(res.body.limit).toBe(500));
+    });
+
+    it('requires a session', async () => {
+      await request(app.getHttpServer()).get('/billing/plans').expect(401);
+      await request(app.getHttpServer())
+        .post('/billing/subscribe')
+        .send({ plan: 'free' })
+        .expect(401);
     });
   });
 });

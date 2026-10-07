@@ -23,6 +23,8 @@ services:
     command: sh -c "npx prisma generate && npx prisma migrate deploy && npx nest start --watch -c nest-cli.docker.json"
     environment:
       NODE_ENV: development
+      # Development: plan payments run in test mode (no money moves).
+      PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-simulated}
       # Same reason as WATCHPACK_POLLING below: TypeScript's watcher polls the files instead of
       # relying on change events, which a save that swaps in a new file never sends.
       TSC_WATCHFILE: DynamicPriorityPolling

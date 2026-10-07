@@ -6,6 +6,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { DAY_MS, DEFAULT_TIMEZONE, startOf } from '../common/time';
+import { PLANS } from '../admin/plans';
+import { currentPlan } from '../billing/billing.rules';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CALL_STATUSES, CallRange, CallStatus } from './call-status';
@@ -13,7 +15,6 @@ import { CallFiltersDto, ListCallsDto } from './dto/list-calls.dto';
 import { UpdateCallDto } from './dto/update-call.dto';
 
 const EXPORT_LIMIT = 10_000;
-const DEFAULT_PLAN_CALL_LIMIT = 500;
 
 const withOrder = {
   order: { select: { id: true, customer: true, phone: true, total: true } },
@@ -219,13 +220,13 @@ export class CallsService {
     const used = await this.prisma.call.count({
       where: { createdAt: { gte: since }, order: { boutiqueId } },
     });
-    return {
-      plan: this.config.get<string>('PLAN_NAME', 'Free plan'),
-      used,
-      limit: Number(
-        this.config.get('PLAN_CALL_LIMIT', DEFAULT_PLAN_CALL_LIMIT),
-      ),
-    };
+    // The shop's own plan and its monthly quota (free until it subscribes).
+    const shop = await this.prisma.boutique.findUnique({
+      where: { id: boutiqueId },
+      select: { plan: true, planStartedAt: true, churnedAt: true },
+    });
+    const plan = shop ? currentPlan(shop) : PLANS[0];
+    return { plan: `${plan.label} plan`, used, limit: plan.quota };
   }
 
   private async baseWhere(
