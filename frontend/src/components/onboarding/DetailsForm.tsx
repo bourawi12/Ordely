@@ -91,7 +91,7 @@ export default function DetailsForm({ boutique, back }: { boutique: Boutique; ba
             Passer
           </button>
           <button type="submit" name="intent" value="finish" className={styles.primary} disabled={pending}>
-            {pending ? "Enregistrement…" : "Terminer"}
+            {pending ? "Enregistrement…" : "Continuer"}
           </button>
         </div>
       </div>

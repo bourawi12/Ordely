@@ -173,6 +173,26 @@ them back to `/dashboard`.
   (`@demo.ordely.test`) with several weeks of orders and calls. Re-running replaces them; it
   refuses to run when `NODE_ENV` is production or the database isn't local.
 
+### Plans and payment
+
+The last onboarding screen, **Votre forfait** (`/onboarding/plan`), recommends the plan that fits
+the daily order volume the merchant declared, lets them pick one, and takes the first month's
+payment for a paid plan before the app opens. The free plan needs no payment.
+
+- **Catalogue**: `backend/src/admin/plans.ts` (Free / Starter / Growth / Pro, monthly price in TND
+  and call quota). The recommendation rule is in `backend/src/billing/billing.rules.ts`.
+- **API**: `GET /api/billing/plans` (catalogue, recommended and current plan) and
+  `POST /api/billing/subscribe` `{ plan, paymentToken? }`. Every attempt is stored in `payments`;
+  the shop's plan (`boutiques.plan`, `planStartedAt`) only changes after a successful charge.
+- **Provider**: `PAYMENTS_PROVIDER`. Empty = paid plans can't be bought. `simulated` = **test
+  mode**: no money moves, only the test cards on the screen work (4242 4242 4242 4242 succeeds,
+  4000 0000 0000 0002 is declined). It is the development default and is refused when
+  `NODE_ENV=production`. A real gateway (Konnect, Flouci) implements the `PaymentProvider`
+  interface in `backend/src/billing/payment-provider.ts`.
+- **Card data never reaches Ordely**: the browser turns the card into a token
+  (`frontend/src/lib/payment.ts`) and only the token is sent; `payments` keeps the brand and last
+  four digits.
+
 ### Voice agent (Ringio)
 
 The AI that calls customers lives in a separate repository,

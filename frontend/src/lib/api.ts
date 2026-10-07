@@ -161,6 +161,37 @@ export interface Boutique {
   onboarding: { completed: boolean; nextStep: 1 | 2 | 3 };
 }
 
+export interface Plan {
+  code: string;
+  label: string;
+  /** Monthly price in TND. */
+  price: number;
+  /** Calls included per month. */
+  quota: number;
+}
+
+export interface BillingPlans {
+  plans: Plan[];
+  /** The plan that fits the shop's declared daily volume. */
+  recommended: string;
+  current: string;
+  currency: string;
+  payments: { available: boolean; testMode: boolean };
+}
+
+export interface Subscription {
+  plan: string;
+  payment: {
+    id: number;
+    amount: number;
+    currency: string;
+    reference: string;
+    cardBrand: string | null;
+    cardLast4: string | null;
+    testMode: boolean;
+  } | null;
+}
+
 export type BoutiqueSection = "identity" | "agent" | "details";
 
 export interface AuthResult {
@@ -330,6 +361,13 @@ updateBoutique: (
     body: JSON.stringify(data),
   }),
 
+billingPlans: () => request<BillingPlans>("/billing/plans"),
+/** `paymentToken` is the card token from the payment provider, never a card number. */
+subscribe: (data: { plan: string; paymentToken?: string }) =>
+  request<Subscription>("/billing/subscribe", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
 completeOnboarding: () =>
   request<Boutique>("/boutique/onboarding/complete", {
     method: "POST",
