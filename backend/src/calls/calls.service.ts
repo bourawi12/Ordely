@@ -6,7 +6,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { DAY_MS, DEFAULT_TIMEZONE, startOf } from '../common/time';
+import { PLANS } from '../admin/plans';
+import { currentPlan } from '../billing/billing.rules';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import {
   isWithinCallWindow,
@@ -17,18 +20,27 @@ import { CallFiltersDto, ListCallsDto } from './dto/list-calls.dto';
 import { UpdateCallDto } from './dto/update-call.dto';
 
 const EXPORT_LIMIT = 10_000;
-const DEFAULT_PLAN_CALL_LIMIT = 500;
 
 const withOrder = {
   order: { select: { id: true, customer: true, phone: true, total: true } },
 } satisfies Prisma.CallInclude;
 
 /** Calls belong to a shop through their order: every query is scoped by `order.boutiqueId`. */
+/** A call as the API returns it: without the voice agent's raw fragments and storage keys. */
+function publicCall<
+  T extends { transcriptParts?: unknown; recordingKeys?: unknown },
+>(call: T): Omit<T, 'transcriptParts' | 'recordingKeys'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { transcriptParts, recordingKeys, ...rest } = call;
+  return rest;
+}
+
 @Injectable()
 export class CallsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
     private readonly realtimeService: RealtimeService,
   ) {}
 
@@ -63,7 +75,7 @@ export class CallsService {
     }
 
     return {
-      items,
+      items: items.map(publicCall),
       total,
       page: query.page,
       pageSize: query.pageSize,
@@ -131,7 +143,22 @@ export class CallsService {
     const attempts = await this.prisma.call.count({
       where: { orderId: call.orderId },
     });
-    return { ...call, attempts };
+    // Voice agent recordings are private: short-lived signed links, one per speaker.
+    const keys = (call.recordingKeys ?? {}) as {
+      agent?: string;
+      customer?: string;
+    };
+    const recordings = {
+      agent: keys.agent ? await this.storage.url(keys.agent) : null,
+      customer: keys.customer ? await this.storage.url(keys.customer) : null,
+    };
+    return {
+      ...publicCall(call),
+      recordingUrl:
+        call.recordingUrl ?? recordings.customer ?? recordings.agent,
+      recordings,
+      attempts,
+    };
   }
 
   /** Records the outcome of a call (status, duration, transcript, …). */
@@ -276,13 +303,13 @@ export class CallsService {
     const used = await this.prisma.call.count({
       where: { createdAt: { gte: since }, order: { boutiqueId } },
     });
-    return {
-      plan: this.config.get<string>('PLAN_NAME', 'Free plan'),
-      used,
-      limit: Number(
-        this.config.get('PLAN_CALL_LIMIT', DEFAULT_PLAN_CALL_LIMIT),
-      ),
-    };
+    // The shop's own plan and its monthly quota (free until it subscribes).
+    const shop = await this.prisma.boutique.findUnique({
+      where: { id: boutiqueId },
+      select: { plan: true, planStartedAt: true, churnedAt: true },
+    });
+    const plan = shop ? currentPlan(shop) : PLANS[0];
+    return { plan: `${plan.label} plan`, used, limit: plan.quota };
   }
 
   private async baseWhere(

@@ -5,9 +5,13 @@ export const STEPS = [
   { slug: "boutique", title: "Votre boutique", short: "Boutique", required: true },
   { slug: "agent", title: "Votre agent", short: "Agent", required: true },
   { slug: "details", title: "Votre activité", short: "Activité", required: false },
+  { slug: "plan", title: "Votre forfait", short: "Forfait", required: true },
 ] as const;
 
-export type StepNumber = 1 | 2 | 3;
+export type StepNumber = 1 | 2 | 3 | 4;
+
+/** The plan screen comes after the last screen the API tracks (3, optional). */
+export const PLAN_STEP: StepNumber = 4;
 
 export function stepHref(step: StepNumber): string {
   return `/onboarding/${STEPS[step - 1].slug}`;

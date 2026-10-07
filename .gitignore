@@ -1,2 +1,5 @@
 .env
 .worktrees/
+
+# Ringio (voice agent) is a separate repository, cloned here for local development.
+Ringio/

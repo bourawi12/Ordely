@@ -55,7 +55,9 @@
 /* ---------- Stepper ---------- */
 .stepper {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* One column per step, however many there are. */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   margin: 0 0 1.75rem;
   padding: 0;
   list-style: none;
@@ -395,6 +397,143 @@
   background: var(--fail-bg);
   color: var(--fail-text);
   font-size: 0.9rem;
+}
+
+/* ---------- Plan and payment (screen 4) ---------- */
+.plans {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.plan {
+  position: relative;
+  /* globals.css stacks every <label>; this one is a card. */
+  display: block;
+  padding: 0.9rem 0.85rem;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.plan:hover {
+  border-color: var(--blue);
+}
+
+.plan:has(input:checked) {
+  border-color: var(--blue);
+  background: var(--sky);
+}
+
+.plan:has(input:focus-visible) {
+  box-shadow: 0 0 0 4px rgba(30, 99, 255, 0.15);
+}
+
+.plan[data-locked] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.plan[data-locked]:hover {
+  border-color: var(--line);
+}
+
+.plan input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.planBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.planName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+}
+
+.planBadge {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.planPrice {
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.planPrice small,
+.planQuota {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.planPrice small {
+  display: block;
+}
+
+.payment {
+  gap: 0.9rem;
+}
+
+.testMode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px dashed #e0b34a;
+  border-radius: 10px;
+  background: #fff8e6;
+  color: #7a5200;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.testMode > span {
+  flex-basis: 100%;
+}
+
+.testCard {
+  padding: 0.25rem 0.55rem;
+  border: 1px solid #e0b34a;
+  border-radius: 8px;
+  background: #fff;
+  color: #7a5200;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.testCard:hover {
+  border-color: #7a5200;
+}
+
+.testCard code {
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .plans {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 600px) {

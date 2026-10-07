@@ -265,7 +265,7 @@ function profile(kind: Archetype, now: number): Profile {
       };
     }
     case 'upsell': {
-      // Free shops already near their 500 calls this month.
+      
       const monthStart =
         Date.UTC(
           new Date(now).getUTCFullYear(),
@@ -438,6 +438,9 @@ async function main() {
         const created = await prisma.order.createManyAndReturn({
           data: batch.map(({ data }) => data),
           select: { id: true },
+        });
+        await prisma.orderItem.createMany({
+          data: created.map((o, j) => ({ ...lines[start + j], orderId: o.id })),
         });
         const rows = created.flatMap((o, j) =>
           calls[start + j].map((c) => ({ ...c, orderId: o.id })),
