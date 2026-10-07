@@ -10,6 +10,12 @@ export interface VoiceCallTaskScenario {
   quantity: number;
   total: string;
   language: string;
+  boutique?: {
+    id?: number | null;
+    name?: string | null;
+    confirmationProcess?: string | null;
+  };
+  instructions?: string[];
 }
 
 export interface VoiceCallTask {

@@ -143,6 +143,9 @@ npm run db:seed              # only runs on an empty orders table
 npm run db:seed -- --reset   # replaces ALL orders and calls
 ```
 
+In development, `start:dev` and `docker compose up` automatically seed the back-office demo
+merchants when the database has no boutiques. Existing data is left untouched.
+
 ### Authentication
 
 - Users sign up at `/register` and log in at `/login`; `/dashboard` and `/orders` require a session.

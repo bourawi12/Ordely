@@ -21,7 +21,7 @@ services:
     # Regenerate the Prisma client in case the schema changed, apply migrations, then copy the
     # runtime worker files into dist before watching. The Nest watch build does not automatically
     # include the JS runtime files that the child-process voice worker requires.
-    command: sh -c "npx prisma generate && npx prisma migrate deploy && node scripts/copy-voice-runtime.js && npx nest start --watch -c nest-cli.docker.json"
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run db:seed:demo:if-empty && node scripts/copy-voice-runtime.js && npx nest start --watch -c nest-cli.docker.json"
     environment:
       NODE_ENV: development
       # Same reason as WATCHPACK_POLLING below: TypeScript's watcher polls the files instead of

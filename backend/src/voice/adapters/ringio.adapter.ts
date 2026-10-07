@@ -14,6 +14,7 @@ export class RingioAdapter implements VoiceAgentClient, OnModuleDestroy {
   private readonly logger = new Logger(RingioAdapter.name);
   private child: ChildProcess | null = null;
   private activeTaskId: string | null = null;
+  private readyCallServerUrl: string | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -52,6 +53,29 @@ export class RingioAdapter implements VoiceAgentClient, OnModuleDestroy {
     return null;
   }
 
+  private async hasCapacity(url: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${url}/api/capacity`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!response.ok) return false;
+      const capacity = (await response.json()) as { canLaunchCall?: unknown };
+      return capacity.canLaunchCall === true;
+    } catch {
+      return false;
+    }
+  }
+
+  async checkCapacity(): Promise<boolean> {
+    const url = await this.getAvailableCallServerUrl();
+    if (!url || !(await this.hasCapacity(url))) {
+      this.readyCallServerUrl = null;
+      return false;
+    }
+    this.readyCallServerUrl = url;
+    return true;
+  }
+
   private get callbackUrl(): string {
     const port = this.config.get<string>('PORT') ?? '3001';
     return (
@@ -62,15 +86,29 @@ export class RingioAdapter implements VoiceAgentClient, OnModuleDestroy {
 
   async startTask(task: VoiceCallTask): Promise<StartTaskResult> {
     if (this.child && this.child.exitCode === null) {
-      return { accepted: false, error: 'An agent call is already running.' };
+      return {
+        accepted: false,
+        deferred: true,
+        error: 'An agent call is already running.',
+      };
     }
 
     try {
-      const callServerUrl = await this.getAvailableCallServerUrl();
+      const callServerUrl =
+        this.readyCallServerUrl ?? (await this.getAvailableCallServerUrl());
+      this.readyCallServerUrl = null;
       if (!callServerUrl) {
         return {
           accepted: false,
+          deferred: true,
           error: 'Local and fallback Ringio servers are unavailable.',
+        };
+      }
+      if (!(await this.hasCapacity(callServerUrl))) {
+        return {
+          accepted: false,
+          deferred: true,
+          error: 'No mobile app is currently available.',
         };
       }
 

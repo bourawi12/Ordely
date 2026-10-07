@@ -754,9 +754,14 @@ describe('App (e2e)', () => {
             boutiqueId: shopId,
             customer: CUSTOMER,
             phone: CUSTOMER_PHONE,
-            item: 'Robe',
-            quantity: 1,
             total: 100,
+            items: {
+              create: {
+                productName: 'Robe',
+                quantity: 1,
+                unitPrice: 100,
+              },
+            },
             calls: { create: { ...call, language: 'French' } },
           },
         });

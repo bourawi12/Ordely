@@ -81,6 +81,7 @@ model Call {
   @@index([status])
   @@index([createdAt])
   @@index([taskId])
+  @@unique([orderId, attempt])
   @@map("calls")
 }
 

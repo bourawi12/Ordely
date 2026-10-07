@@ -1,0 +1,165 @@
+import { PrismaService } from '../../prisma/prisma.service';
+import { CallDispatcherService } from './call-dispatcher.service';
+import { CallOrchestratorService } from './call-orchestrator.service';
+import { FakeVoiceAgentClient } from '../../voice/adapters/fake-voice-agent-client';
+
+describe('CallOrchestratorService', () => {
+  let service: CallOrchestratorService;
+  let voiceAgent: FakeVoiceAgentClient;
+  let prisma: {
+    order: { findMany: jest.Mock };
+    call: { create: jest.Mock };
+  };
+  let dispatcher: { dispatchCall: jest.Mock };
+
+  const order = {
+    id: 50,
+    boutiqueId: 1,
+    boutique: { callStartTime: '09:00', callEndTime: '17:00' },
+    calls: [],
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-07T10:00:00.000Z'));
+    voiceAgent = new FakeVoiceAgentClient();
+    prisma = {
+      order: { findMany: jest.fn().mockResolvedValue([order]) },
+      call: { create: jest.fn().mockResolvedValue({ id: 101 }) },
+    };
+    dispatcher = {
+      dispatchCall: jest.fn().mockResolvedValue({ status: 'pending' }),
+    };
+    service = new CallOrchestratorService(
+      prisma as unknown as PrismaService,
+      dispatcher as unknown as CallDispatcherService,
+      voiceAgent,
+    );
+  });
+
+  afterEach(() => jest.useRealTimers());
+
+  it('automatically creates and dispatches the first attempt', async () => {
+    await service.pollOnce();
+
+    expect(prisma.call.create).toHaveBeenCalledWith({
+      data: { orderId: 50, attempt: 1 },
+      select: { id: true },
+    });
+    expect(dispatcher.dispatchCall).toHaveBeenCalledWith(1, 101);
+  });
+
+  it('does not create or consume an attempt when no mobile app is available', async () => {
+    voiceAgent.capacityAvailable = false;
+
+    await service.pollOnce();
+
+    expect(prisma.call.create).not.toHaveBeenCalled();
+    expect(dispatcher.dispatchCall).not.toHaveBeenCalled();
+  });
+
+  it('automatically queues the next retry after its delay', async () => {
+    prisma.order.findMany.mockResolvedValue([
+      {
+        ...order,
+        calls: [
+          {
+            id: 100,
+            attempt: 1,
+            status: 'no_answer',
+            disposition: 'no_answer',
+            completedAt: new Date('2026-10-07T09:00:00.000Z'),
+            dispatchedAt: new Date('2026-10-07T08:00:00.000Z'),
+            taskId: 'prior-task',
+          },
+        ],
+      },
+    ]);
+
+    await service.pollOnce();
+
+    expect(prisma.call.create).toHaveBeenCalledWith({
+      data: { orderId: 50, attempt: 2 },
+      select: { id: true },
+    });
+    expect(dispatcher.dispatchCall).toHaveBeenCalledWith(1, 101);
+  });
+
+  it('defers after closing and dispatches at the next day opening', async () => {
+    jest.setSystemTime(new Date('2026-10-07T16:00:00.000Z'));
+
+    await service.pollOnce();
+
+    expect(prisma.call.create).not.toHaveBeenCalled();
+    expect(dispatcher.dispatchCall).not.toHaveBeenCalled();
+
+    jest.setSystemTime(new Date('2026-10-08T08:00:00.000Z'));
+    await service.pollOnce();
+
+    expect(prisma.call.create).toHaveBeenCalledWith({
+      data: { orderId: 50, attempt: 1 },
+      select: { id: true },
+    });
+    expect(dispatcher.dispatchCall).toHaveBeenCalledWith(1, 101);
+  });
+
+  it('advances past batches of orders that cannot be retried', async () => {
+    const completedAt = new Date('2026-10-07T09:00:00.000Z');
+    prisma.order.findMany
+      .mockResolvedValueOnce(
+        Array.from({ length: 100 }, (_, index) => ({
+          ...order,
+          id: index + 1,
+          calls: [
+            {
+              id: index + 1000,
+              attempt: 1,
+              status: 'failed',
+              disposition: 'needs_human',
+              completedAt,
+              dispatchedAt: completedAt,
+              taskId: `task-${index}`,
+            },
+          ],
+        })),
+      )
+      .mockResolvedValueOnce([{ ...order, id: 101 }]);
+
+    await service.pollOnce();
+    expect(prisma.call.create).not.toHaveBeenCalled();
+
+    await service.pollOnce();
+
+    expect(prisma.order.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ cursor: { id: 100 }, skip: 1 }),
+    );
+    expect(prisma.call.create).toHaveBeenCalledWith({
+      data: { orderId: 101, attempt: 1 },
+      select: { id: true },
+    });
+  });
+
+  it('reuses an existing pending attempt rather than allocating another', async () => {
+    prisma.order.findMany.mockResolvedValue([
+      {
+        ...order,
+        calls: [
+          {
+            id: 101,
+            attempt: 1,
+            status: 'pending',
+            disposition: null,
+            completedAt: null,
+            dispatchedAt: null,
+            taskId: null,
+          },
+        ],
+      },
+    ]);
+
+    await service.pollOnce();
+
+    expect(prisma.call.create).not.toHaveBeenCalled();
+    expect(dispatcher.dispatchCall).toHaveBeenCalledWith(1, 101);
+  });
+});

@@ -1,8 +1,8 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
-import { PrismaService } from '../prisma/prisma.service';
-import { CallDispatcherService } from '../calls/orchestration/call-dispatcher.service';
-import { FakeVoiceAgentClient } from './adapters/fake-voice-agent-client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CallDispatcherService } from './call-dispatcher.service';
+import { FakeVoiceAgentClient } from '../../voice/adapters/fake-voice-agent-client';
 
 describe('CallDispatcherService', () => {
   let service: CallDispatcherService;
@@ -29,6 +29,8 @@ describe('CallDispatcherService', () => {
       total: new Decimal('120.500'),
       boutique: {
         id: 1,
+        name: 'Demo Boutique',
+        confirmationProcess: 'default',
         callLanguages: ['ar-TN', 'fr'],
         callStartTime: '00:00',
         callEndTime: '23:59',
@@ -72,6 +74,18 @@ describe('CallDispatcherService', () => {
     expect(task.scenario.item).toBe('Robe d’été x2');
     expect(task.scenario.quantity).toBe(2);
     expect(task.scenario.total).toBe('120.500 TND');
+    expect(task.scenario.boutique).toMatchObject({
+      id: 1,
+      name: 'Demo Boutique',
+      confirmationProcess: 'default',
+    });
+    expect(task.scenario.instructions).toEqual(
+      expect.arrayContaining([
+        'Verify the order details with the customer before confirming.',
+        'Boutique: Demo Boutique.',
+        'Confirmation process: default.',
+      ]),
+    );
 
     expect(prismaMock.call.update).toHaveBeenCalledWith({
       where: { id: 101 },

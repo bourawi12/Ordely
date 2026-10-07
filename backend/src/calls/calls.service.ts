@@ -8,6 +8,10 @@ import { Prisma } from '@prisma/client';
 import { DAY_MS, DEFAULT_TIMEZONE, startOf } from '../common/time';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import {
+  isWithinCallWindow,
+  nextAttemptNumber,
+} from './orchestration/call-orchestration-policy';
 import { CALL_STATUSES, CallRange, CallStatus } from './call-status';
 import { CallFiltersDto, ListCallsDto } from './dto/list-calls.dto';
 import { UpdateCallDto } from './dto/update-call.dto';
@@ -134,7 +138,7 @@ export class CallsService {
   async update(boutiqueId: number, id: number, dto: UpdateCallDto) {
     await this.findOne(boutiqueId, id);
 
-  const updated = await this.prisma.call.update({
+    const updated = await this.prisma.call.update({
       where: { id },
       data: {
         status: dto.status,
@@ -170,7 +174,17 @@ export class CallsService {
   async queue(boutiqueId: number, orderId: number) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, boutiqueId },
-      include: { calls: { select: { status: true } } },
+      include: {
+        boutique: { select: { callStartTime: true, callEndTime: true } },
+        calls: {
+          select: {
+            status: true,
+            attempt: true,
+            disposition: true,
+            completedAt: true,
+          },
+        },
+      },
     });
     if (!order) {
       throw new NotFoundException(`Order ${orderId} not found`);
@@ -180,13 +194,29 @@ export class CallsService {
         `Order ${orderId} is already ${order.status}`,
       );
     }
+    if (
+      !isWithinCallWindow(
+        order.boutique.callStartTime,
+        order.boutique.callEndTime,
+      )
+    ) {
+      throw new ConflictException(
+        'Calls can only be queued during the boutique calling window.',
+      );
+    }
     if (order.calls.some((c) => c.status === 'pending')) {
       throw new ConflictException(
         `A call is already queued for order ${orderId}`,
       );
     }
+    const attempt = nextAttemptNumber(order.calls);
+    if (attempt === null) {
+      throw new ConflictException(
+        `No call attempt is currently eligible for order ${orderId}`,
+      );
+    }
     const created = await this.prisma.call.create({
-      data: { orderId, attempt: order.calls.length + 1 },
+      data: { orderId, attempt },
       include: withOrder,
     });
 
@@ -208,12 +238,37 @@ export class CallsService {
         status: 'pending',
         calls: { none: { status: 'pending' } },
       },
-      select: { id: true, _count: { select: { calls: true } } },
+      select: {
+        id: true,
+        boutique: { select: { callStartTime: true, callEndTime: true } },
+        calls: {
+          select: {
+            status: true,
+            attempt: true,
+            disposition: true,
+            completedAt: true,
+          },
+        },
+      },
     });
-    await this.prisma.call.createMany({
-      data: orders.map((o) => ({ orderId: o.id, attempt: o._count.calls + 1 })),
+    const data = orders.flatMap((order) => {
+      if (
+        !isWithinCallWindow(
+          order.boutique.callStartTime,
+          order.boutique.callEndTime,
+        )
+      ) {
+        return [];
+      }
+      const attempt = nextAttemptNumber(order.calls);
+      return attempt === null ? [] : [{ orderId: order.id, attempt }];
     });
-    return { queued: orders.length };
+    if (data.length === 0) return { queued: 0 };
+    const result = await this.prisma.call.createMany({
+      data,
+      skipDuplicates: true,
+    });
+    return { queued: result.count };
   }
 
   async usage(boutiqueId: number) {

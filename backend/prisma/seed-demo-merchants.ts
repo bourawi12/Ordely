@@ -8,6 +8,7 @@
  * Re-running replaces the previous demo merchants (accounts ending in @demo.ordely.test) and
  * touches nothing else. Refuses to run in production or against a non-local database.
  */
+import 'dotenv/config';
 import { Prisma, PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
@@ -291,6 +292,16 @@ async function main() {
   refuseOutsideDev();
   const prisma = new PrismaClient();
   try {
+    if (process.argv.includes('--if-empty')) {
+      const boutiqueCount = await prisma.boutique.count();
+      if (boutiqueCount > 0) {
+        console.log(
+          `Database already contains ${boutiqueCount} boutiques; skipping demo seed.`,
+        );
+        return;
+      }
+    }
+
     // Replace the previous demo merchants only.
     const old = await prisma.user.findMany({
       where: { email: { endsWith: `@${DEMO_DOMAIN}` } },
@@ -352,7 +363,10 @@ async function main() {
       });
 
       // Orders, day by day since signup.
-      const orders: Prisma.OrderCreateManyInput[] = [];
+      const orders: {
+        data: Prisma.OrderCreateManyInput;
+        item: Omit<Prisma.OrderItemCreateManyInput, 'orderId'>;
+      }[] = [];
       for (
         let day = Math.floor((p.signupAt + TUNIS) / DAY) * DAY;
         day <= today;
@@ -366,15 +380,22 @@ async function main() {
           const at = businessMoment(day);
           if (at < p.signupAt || at > now - 20 * MINUTE) continue;
           const [item, min, max] = pick(ITEMS[p.sector]);
+          const quantity = rand() < 0.85 ? 1 : 2;
+          const total = between(min, max);
           orders.push({
-            boutiqueId: shop.id,
-            customer: `Client ${between(1000, 9999)}`,
-            phone: `+216 ${pick(['2', '5', '9'])}${between(0, 9)} ${between(100, 999)} ${between(100, 999)}`,
-            item,
-            quantity: rand() < 0.85 ? 1 : 2,
-            total: between(min, max),
-            status: 'pending',
-            createdAt: new Date(at),
+            data: {
+              boutiqueId: shop.id,
+              customer: `Client ${between(1000, 9999)}`,
+              phone: `+216 ${pick(['2', '5', '9'])}${between(0, 9)} ${between(100, 999)} ${between(100, 999)}`,
+              total,
+              status: 'pending',
+              createdAt: new Date(at),
+            },
+            item: {
+              productName: item,
+              quantity,
+              unitPrice: total / quantity,
+            },
           });
         }
       }
@@ -383,7 +404,7 @@ async function main() {
       const calls: Omit<Prisma.CallCreateManyInput, 'orderId'>[][] = [];
       for (const order of orders) {
         const list: Omit<Prisma.CallCreateManyInput, 'orderId'>[] = [];
-        let at = (order.createdAt as Date).getTime() + between(2, 15) * MINUTE;
+        let at = (order.data.createdAt as Date).getTime() + between(2, 15) * MINUTE;
         for (let attempt = 1; attempt <= 3 && at < now; attempt++) {
           const hour = new Date(at + TUNIS).getUTCHours();
           const lunch = hour >= 12 && hour < 15 ? 0.82 : hour >= 18 ? 1.05 : 1;
@@ -406,7 +427,7 @@ async function main() {
             language,
             createdAt: new Date(at),
           });
-          order.status = yes ? 'confirmed' : 'cancelled';
+          order.data.status = yes ? 'confirmed' : 'cancelled';
           break;
         }
         calls.push(list);
@@ -415,12 +436,17 @@ async function main() {
       for (let start = 0; start < orders.length; start += 1000) {
         const batch = orders.slice(start, start + 1000);
         const created = await prisma.order.createManyAndReturn({
-          data: batch,
+          data: batch.map(({ data }) => data),
           select: { id: true },
         });
         const rows = created.flatMap((o, j) =>
           calls[start + j].map((c) => ({ ...c, orderId: o.id })),
         );
+        const items = created.map((order, j) => ({
+          ...batch[j].item,
+          orderId: order.id,
+        }));
+        if (items.length) await prisma.orderItem.createMany({ data: items });
         if (rows.length) await prisma.call.createMany({ data: rows });
         totals = {
           orders: totals.orders + batch.length,
