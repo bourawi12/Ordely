@@ -13,7 +13,6 @@ export interface Plan {
 }
 
 export const PLANS: readonly Plan[] = [
-  { code: 'free', label: 'Free', price: 0, quota: 500 },
   { code: 'starter', label: 'Starter', price: 79, quota: 1500 },
   { code: 'growth', label: 'Growth', price: 199, quota: 5000 },
   { code: 'pro', label: 'Pro', price: 449, quota: 15000 },

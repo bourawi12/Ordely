@@ -73,6 +73,12 @@ export interface Call {
   transcriptEntries?: CallTranscriptEntry[];
 }
 
+/** One call with its order and, for voice agent calls, signed links to each speaker's audio. */
+export type CallDetail = CallWithOrder & {
+  attempts: number;
+  recordings?: { agent: string | null; customer: string | null };
+};
+
 export type CallWithOrder = Call & {
   order: Pick<Order, "id" | "customer" | "phone" | "total">;
 };
@@ -184,6 +190,37 @@ export interface Boutique {
   carrier: string | null;
   onboardingCompletedAt: string | null;
   onboarding: { completed: boolean; nextStep: 1 | 2 | 3 };
+}
+
+export interface Plan {
+  code: string;
+  label: string;
+  /** Monthly price in TND. */
+  price: number;
+  /** Calls included per month. */
+  quota: number;
+}
+
+export interface BillingPlans {
+  plans: Plan[];
+  /** The plan that fits the shop's declared daily volume. */
+  recommended: string;
+  current: string;
+  currency: string;
+  payments: { available: boolean; testMode: boolean };
+}
+
+export interface Subscription {
+  plan: string;
+  payment: {
+    id: number;
+    amount: number;
+    currency: string;
+    reference: string;
+    cardBrand: string | null;
+    cardLast4: string | null;
+    testMode: boolean;
+  } | null;
 }
 
 export type BoutiqueSection = "identity" | "agent" | "details";
@@ -355,6 +392,13 @@ updateBoutique: (
     body: JSON.stringify(data),
   }),
 
+billingPlans: () => request<BillingPlans>("/billing/plans"),
+/** `paymentToken` is the card token from the payment provider, never a card number. */
+subscribe: (data: { plan: string; paymentToken?: string }) =>
+  request<Subscription>("/billing/subscribe", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
 completeOnboarding: () =>
   request<Boutique>("/boutique/onboarding/complete", {
     method: "POST",
@@ -364,8 +408,7 @@ completeOnboarding: () =>
   usage: () => request<Usage>("/calls/usage"),
   listCalls: (filters: CallFilters) =>
     request<CallsPage>(`/calls${query({ ...filters })}`),
-  getCall: (id: number) =>
-    request<CallWithOrder & { attempts: number }>(`/calls/${id}`),
+  getCall: (id: number) => request<CallDetail>(`/calls/${id}`),
   exportCalls: async (filters: Omit<CallFilters, "page">) =>
     (await send(`/calls/export${query({ ...filters })}`, undefined, true)).text(),
   queueCall: (orderId: number) =>

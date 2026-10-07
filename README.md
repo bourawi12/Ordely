@@ -173,6 +173,70 @@ them back to `/dashboard`.
   (`@demo.ordely.test`) with several weeks of orders and calls. Re-running replaces them; it
   refuses to run when `NODE_ENV` is production or the database isn't local.
 
+### Plans and payment
+
+The last onboarding screen, **Votre forfait** (`/onboarding/plan`), recommends the plan that fits
+the daily order volume the merchant declared, lets them pick one, and takes the first month's
+payment for a paid plan before the app opens. The free plan needs no payment.
+
+- **Catalogue**: `backend/src/admin/plans.ts` (Free / Starter / Growth / Pro, monthly price in TND
+  and call quota). The recommendation rule is in `backend/src/billing/billing.rules.ts`.
+- **API**: `GET /api/billing/plans` (catalogue, recommended and current plan) and
+  `POST /api/billing/subscribe` `{ plan, paymentToken? }`. Every attempt is stored in `payments`;
+  the shop's plan (`boutiques.plan`, `planStartedAt`) only changes after a successful charge.
+- **Provider**: `PAYMENTS_PROVIDER`. Empty = paid plans can't be bought. `simulated` = **test
+  mode**: no money moves, only the test cards on the screen work (4242 4242 4242 4242 succeeds,
+  4000 0000 0000 0002 is declined). It is the development default and is refused when
+  `NODE_ENV=production`. A real gateway (Konnect, Flouci) implements the `PaymentProvider`
+  interface in `backend/src/billing/payment-provider.ts`.
+- **Card data never reaches Ordely**: the browser turns the card into a token
+  (`frontend/src/lib/payment.ts`) and only the token is sent; `payments` keeps the brand and last
+  four digits.
+
+### Voice agent (Ringio)
+
+The AI that calls customers lives in a separate repository,
+[Ringio](https://github.com/HadricheAymen/Ringio), cloned locally into `Ringio/` (ignored by
+git). Ordely and the agent talk over HTTP:
+
+```
+"Call now" ─► calls row (pending) ─► dispatcher (backend/src/voice) ── POST /api/task/start ─► agent :4200
+                                                                                                 │ phone call
+order confirmed/cancelled ◄─ Ordely decides ◄── /api/internal/voice/{events,transcript,recordings,result} ◄─┘
+```
+
+- **Dispatcher**: every 5 s, hands the oldest queued call to the agent (one at a time, within the
+  shop's call hours). Off unless `VOICE_DISPATCH_ENABLED=true`. Every call goes to
+  `VOICE_TEST_DESTINATION`, Ringio's simulated test number, never to a real customer.
+- **Callbacks**: public routes authenticated by the shared secret `VOICE_CALLBACK_SECRET`. The
+  transcript and both recordings (MinIO) appear on the call in Call Logs.
+- **Decision**: only a clear `CONFIRMED`/`CANCELLED` with confidence ≥ `VOICE_MIN_CONFIDENCE`
+  changes the order. Anything else leaves it pending (the call shows "No answer"). A call that
+  never reports back is closed after `VOICE_CALL_TIMEOUT_MINUTES`.
+- The agent needs the changes in `docs/integrations/ringio-ordely-task.patch` (order passed to
+  Gemini, `report_decision` function, real result instead of "confirmed"). In `Ringio/`:
+  `git apply ../docs/integrations/ringio-ordely-task.patch`.
+
+**Test without a phone** (the fake agent replays a scripted call through the real callbacks):
+
+```bash
+# root .env: VOICE_DISPATCH_ENABLED=true, VOICE_AGENT_TOKEN and VOICE_CALLBACK_SECRET set
+docker compose up -d backend
+cd backend && npm run voice:fake-agent                 # FAKE_SCENARIO=yes|no|unclear|no_answer|random
+# then "Call now" on a pending order: the order is confirmed within a few seconds
+```
+
+**Test with the real agent** (Node 22+, an Android phone on the same Wi-Fi, a Gemini API key):
+
+1. `Ringio/mock-external-service/.env`: set `GEMINI_API_KEY`. Its `AGENT_SERVICE_TOKEN` and
+   `ORDELY_CALLBACK_SECRET` must equal Ordely's `VOICE_AGENT_TOKEN` and `VOICE_CALLBACK_SECRET`.
+2. `cd Ringio/voip-call-server && npm install && npm start` (port 4100).
+3. Phone: `cd Ringio/voip-mobile-app && npm install && npm run android` (first time), then
+   `npm run start:local`; keep the app open.
+4. `cd Ringio/mock-external-service && npm install && npm start` (port 4200).
+5. Root `.env`: `VOICE_DISPATCH_ENABLED=true`, then `docker compose up -d backend`.
+6. In Ordely, "Call now" on a pending order: the phone rings, answer and speak as the customer.
+
 ### API
 
 - `GET /api/health` — reports app and database status (public)

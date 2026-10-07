@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Icon, { type IconName } from "@/components/Icon";
 import ui from "@/components/app/ui.module.css";
-import type { CallStatus, CallWithOrder } from "@/lib/api";
+import type { CallDetail as Detail, CallStatus } from "@/lib/api";
 import { formatDuration, formatTND } from "@/lib/format";
 import styles from "./call-logs.module.css";
 
@@ -14,7 +14,7 @@ const LOOK: Record<CallStatus, { icon: IconName; label: string; color: string; b
   pending: { icon: "clock", label: "Pending", color: "var(--pending-text)", bg: "var(--pending-bg)" },
 };
 
-export default function CallDetail({ call }: { call: (CallWithOrder & { attempts: number }) | null }) {
+export default function CallDetail({ call }: { call: Detail | null }) {
   if (!call) {
     return (
       <aside className={`${ui.card} ${styles.detail}`}>
@@ -84,7 +84,19 @@ export default function CallDetail({ call }: { call: (CallWithOrder & { attempts
         </p>
       )}
 
-      {call.recordingUrl ? (
+      {call.recordings?.customer && call.recordings.agent ? (
+        // Voice agent calls: one recording per side of the conversation.
+        <>
+          <span className={styles.recording}>
+            <Icon name="play" size={18} /> Customer
+          </span>
+          <audio className={styles.audio} controls preload="none" src={call.recordings.customer} />
+          <span className={styles.recording}>
+            <Icon name="play" size={18} /> Agent
+          </span>
+          <audio className={styles.audio} controls preload="none" src={call.recordings.agent} />
+        </>
+      ) : call.recordingUrl ? (
         <>
           <span className={styles.recording}>
             <Icon name="play" size={18} /> Play recording

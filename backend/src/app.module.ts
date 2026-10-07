@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AdminModule } from './admin/admin.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuthModule } from './auth/auth.module';
+import { BillingModule } from './billing/billing.module';
 import { BoutiqueModule } from './boutique/boutique.module';
 import { CallsModule } from './calls/calls.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -33,6 +34,8 @@ import { VoiceModule } from './voice/voice.module';
     AnalyticsModule,
     RealtimeModule,
     AdminModule,
+    VoiceModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

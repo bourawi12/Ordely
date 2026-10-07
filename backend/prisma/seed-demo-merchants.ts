@@ -264,7 +264,7 @@ function profile(kind: Archetype, now: number): Profile {
       };
     }
     case 'upsell': {
-      // Free shops already near their 500 calls this month.
+      
       const monthStart =
         Date.UTC(
           new Date(now).getUTCFullYear(),
@@ -353,6 +353,12 @@ async function main() {
 
       // Orders, day by day since signup.
       const orders: Prisma.OrderCreateManyInput[] = [];
+      // One product line per order, inserted once the orders have ids.
+      const lines: {
+        productName: string;
+        quantity: number;
+        unitPrice: number;
+      }[] = [];
       for (
         let day = Math.floor((p.signupAt + TUNIS) / DAY) * DAY;
         day <= today;
@@ -366,13 +372,14 @@ async function main() {
           const at = businessMoment(day);
           if (at < p.signupAt || at > now - 20 * MINUTE) continue;
           const [item, min, max] = pick(ITEMS[p.sector]);
+          const quantity = rand() < 0.85 ? 1 : 2;
+          const unitPrice = between(min, max);
+          lines.push({ productName: item, quantity, unitPrice });
           orders.push({
             boutiqueId: shop.id,
             customer: `Client ${between(1000, 9999)}`,
             phone: `+216 ${pick(['2', '5', '9'])}${between(0, 9)} ${between(100, 999)} ${between(100, 999)}`,
-            item,
-            quantity: rand() < 0.85 ? 1 : 2,
-            total: between(min, max),
+            total: unitPrice * quantity,
             status: 'pending',
             createdAt: new Date(at),
           });
@@ -417,6 +424,9 @@ async function main() {
         const created = await prisma.order.createManyAndReturn({
           data: batch,
           select: { id: true },
+        });
+        await prisma.orderItem.createMany({
+          data: created.map((o, j) => ({ ...lines[start + j], orderId: o.id })),
         });
         const rows = created.flatMap((o, j) =>
           calls[start + j].map((c) => ({ ...c, orderId: o.id })),
