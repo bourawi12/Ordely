@@ -75,6 +75,7 @@ describe('AuthService', () => {
       email: 'ada@example.com',
       name: 'Ada',
       password: 'correct horse',
+      acceptedTerms: true,
     });
 
     expect($transaction).toHaveBeenCalledTimes(1);
@@ -84,7 +85,10 @@ describe('AuthService', () => {
       // No look chosen: Ordely blue, following the device theme.
       accentColor: null,
       themeMode: 'system',
+      termsVersion: '1.0',
+      privacyVersion: '1.0',
     });
+    expect(user.create.mock.calls[0][0].data.acceptedTermsAt).toBeInstanceOf(Date);
     expect(result.user).toMatchObject({ boutiqueId: 42 });
   });
 
@@ -100,6 +104,7 @@ describe('AuthService', () => {
       password: 'correct horse',
       accentColor: '#7c3aed',
       themeMode: 'dark',
+      acceptedTerms: true,
     });
 
     expect(result.user).toMatchObject({
@@ -118,6 +123,7 @@ describe('AuthService', () => {
       email: 'ada@example.com',
       name: 'Ada',
       password: 'correct horse',
+      acceptedTerms: true,
     });
 
     const stored = user.create.mock.calls[0][0].data.passwordHash;
@@ -145,6 +151,7 @@ describe('AuthService', () => {
         email: 'ada@example.com',
         name: 'Ada',
         password: 'Str0ng!pass',
+        acceptedTerms: true,
       });
 
       const stored = user.create.mock.calls[0][0].data;
@@ -325,6 +332,7 @@ describe('AuthService', () => {
         email: 'ada@example.com',
         name: 'Ada',
         password: 'password1',
+        acceptedTerms: true,
       }),
     ).rejects.toThrow(ConflictException);
   });

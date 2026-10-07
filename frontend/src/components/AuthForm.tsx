@@ -37,6 +37,7 @@ export default function AuthForm({
   const suffix = next ? `?next=${encodeURIComponent(next)}` : "";
   // Sign-up only: drives the password checklist. React empties the field after each submit.
   const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   useEffect(() => setPassword(""), [state]);
   // Login only: the "forgot password" link carries the address typed so far.
   const emailRef = useRef<HTMLInputElement>(null);
@@ -142,7 +143,35 @@ export default function AuthForm({
         </label>
       )}
 
-      <button type="submit" disabled={pending} className={styles.submit}>
+      {!isLogin && (
+        <label className={styles.termsCheckboxLabel}>
+          <input
+            type="checkbox"
+            name="acceptedTerms"
+            value="true"
+            required
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+          />
+          <span>
+            J&apos;accepte les{" "}
+            <Link href="/terms" target="_blank" rel="noopener noreferrer">
+              Conditions Générales
+            </Link>{" "}
+            et la{" "}
+            <Link href="/privacy" target="_blank" rel="noopener noreferrer">
+              Politique de Confidentialité
+            </Link>
+            .
+          </span>
+        </label>
+      )}
+
+      <button
+        type="submit"
+        disabled={pending || (!isLogin && !acceptedTerms)}
+        className={styles.submit}
+      >
         {pending
           ? "Veuillez patienter…"
           : isLogin

@@ -1,5 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
+  Equals,
+  IsBoolean,
   IsEmail,
   IsIn,
   IsNotEmpty,
@@ -43,4 +45,17 @@ export class RegisterDto {
   @IsOptional()
   @IsIn(THEME_MODES)
   themeMode?: ThemeMode;
+
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  @Equals(true, { message: 'You must accept the Terms & Conditions and Privacy Policy' })
+  acceptedTerms: boolean;
+
+  @IsOptional()
+  @IsString()
+  termsVersion?: string;
+
+  @IsOptional()
+  @IsString()
+  privacyVersion?: string;
 }

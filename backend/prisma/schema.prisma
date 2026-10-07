@@ -142,6 +142,12 @@ model User {
   passwordResetSentAt    DateTime? @db.Timestamptz(6)
   /// Set by a password reset: sessions issued before it stop working.
   passwordChangedAt      DateTime? @db.Timestamptz(6)
+  /// When the user accepted the terms & privacy policy during registration.
+  acceptedTermsAt        DateTime? @db.Timestamptz(6)
+  /// Version of the terms accepted (e.g. "1.0").
+  termsVersion           String?   @db.VarChar(20)
+  /// Version of the privacy policy accepted (e.g. "1.0").
+  privacyVersion         String?   @db.VarChar(20)
   /// Ordely team member: opens the internal back office (/admin). Never set through the API;
   /// granted by ADMIN_EMAIL at startup (src/admin/admin-bootstrap.service.ts) or in the database.
   isPlatformAdmin        Boolean   @default(false)
