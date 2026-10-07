@@ -30,6 +30,7 @@ describe('CallsService queue policy', () => {
     service = new CallsService(
       prisma as never,
       { get: jest.fn() } as never,
+      {} as never,
       realtime as never,
     );
   });

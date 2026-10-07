@@ -59,7 +59,7 @@ model Call {
   /// When the call was handed to the voice agent; null while still queued in Ordely.
   dispatchedAt    DateTime? @db.Timestamptz(6)
   /// The voice provider's own call id, for support and debugging.
-  providerCallId  String?   @db.VarChar(64)
+  providerCallId  String?   @db.VarChar(100)
   /// Raw transcript fragments as streamed by the agent: [{ seq, speaker, text }].
   /// `transcript` holds the readable version (consecutive fragments merged).
   transcriptParts Json?
@@ -70,15 +70,12 @@ model Call {
   /// UUID task ID for voice-agent correlation
   taskId          String?   @unique @db.VarChar(36)
   /// Provider's call ID (Ringio UUID), stored as correlation data
-  providerCallId  String?   @db.VarChar(100)
   /// Transport phase: dispatched, ringing, connected, ended, error, etc.
   transportPhase  String?   @db.VarChar(20)
   /// Business disposition from the agent: confirmed, declined, etc.
   disposition     String?   @db.VarChar(20)
   /// Human-readable failure reason shown in the dashboard
   failureReason   String?   @db.VarChar(500)
-  /// When the call was dispatched to the voice agent
-  dispatchedAt    DateTime? @db.Timestamptz(6)
   /// When the provider reported the call ended
   completedAt     DateTime? @db.Timestamptz(6)
   /// Marks this as a simulated test call
