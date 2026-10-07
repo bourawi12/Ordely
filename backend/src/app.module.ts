@@ -13,6 +13,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { MailModule } from './mail/mail.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { StorageModule } from './storage/storage.module';
 import { VoiceModule } from './voice/voice.module';
 
@@ -27,9 +28,11 @@ import { VoiceModule } from './voice/voice.module';
     AuthModule,
     BoutiqueModule,
     OrdersModule,
+    VoiceModule,
     CallsModule,
     DashboardModule,
     AnalyticsModule,
+    RealtimeModule,
     AdminModule,
     VoiceModule,
     BillingModule,

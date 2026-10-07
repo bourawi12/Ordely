@@ -6,11 +6,11 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && node scripts/copy-voice-runtime.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
+    "start:dev": "node scripts/copy-voice-runtime.js && nest start --watch",
+    "start:debug": "node scripts/copy-voice-runtime.js && nest start --debug --watch",
     "start:prod": "prisma migrate deploy && node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
@@ -32,7 +32,11 @@
     "@nestjs/core": "^10.0.0",
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/platform-socket.io": "^10.4.22",
     "@nestjs/throttler": "^6.7.0",
+    "@google/genai": "^2.25.0",
+    "@roamhq/wrtc": "^0.10.0",
+    "@nestjs/websockets": "^10.4.22",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
@@ -41,7 +45,9 @@
     "nodemailer": "^7.0.13",
     "prisma": "^6.19.3",
     "reflect-metadata": "^0.2.0",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.8.4",
+    "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

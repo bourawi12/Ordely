@@ -10,6 +10,7 @@ import { PLANS } from '../admin/plans';
 import { currentPlan } from '../billing/billing.rules';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { CALL_STATUSES, CallRange, CallStatus } from './call-status';
 import { CallFiltersDto, ListCallsDto } from './dto/list-calls.dto';
 import { UpdateCallDto } from './dto/update-call.dto';
@@ -36,6 +37,7 @@ export class CallsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly storage: StorageService,
+    private readonly realtimeService: RealtimeService,
   ) {}
 
   private get timezone() {
@@ -123,7 +125,13 @@ export class CallsService {
   async findOne(boutiqueId: number, id: number) {
     const call = await this.prisma.call.findFirst({
       where: { id, order: { boutiqueId } },
-      include: withOrder,
+      include: {
+        ...withOrder,
+        recordings: true,
+        transcriptEntries: {
+          orderBy: { sequence: 'asc' },
+        },
+      },
     });
     if (!call) {
       throw new NotFoundException(`Call ${id} not found`);
@@ -153,7 +161,7 @@ export class CallsService {
   async update(boutiqueId: number, id: number, dto: UpdateCallDto) {
     await this.findOne(boutiqueId, id);
 
-    return this.prisma.call.update({
+  const updated = await this.prisma.call.update({
       where: { id },
       data: {
         status: dto.status,
@@ -172,6 +180,17 @@ export class CallsService {
       },
       include: withOrder,
     });
+
+    if (dto.status) {
+      this.realtimeService.emitCallStatusChanged(boutiqueId, {
+        callId: updated.id,
+        orderId: updated.orderId,
+        status: updated.status,
+        updatedAt: updated.createdAt.toISOString(),
+      });
+    }
+
+    return updated;
   }
 
   /** Queues a confirmation call for a pending order. */
@@ -193,10 +212,19 @@ export class CallsService {
         `A call is already queued for order ${orderId}`,
       );
     }
-    return this.prisma.call.create({
+    const created = await this.prisma.call.create({
       data: { orderId, attempt: order.calls.length + 1 },
       include: withOrder,
     });
+
+    this.realtimeService.emitCallStatusChanged(boutiqueId, {
+      callId: created.id,
+      orderId: created.orderId,
+      status: created.status,
+      updatedAt: created.createdAt.toISOString(),
+    });
+
+    return created;
   }
 
   /** Queues a call for every pending order that doesn't already have one queued. */
