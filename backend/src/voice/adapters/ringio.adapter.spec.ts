@@ -326,6 +326,15 @@ describe('RingioAdapter', () => {
     expect(SYSTEM_INSTRUCTION).toContain(
       'A yes to being available is not confirmation of the order',
     );
+    expect(SYSTEM_INSTRUCTION).toContain(
+      'thank them for their time and close',
+    );
+    expect(SYSTEM_INSTRUCTION).toContain(
+      'acknowledge that without pressure',
+    );
+    expect(SYSTEM_INSTRUCTION).toContain(
+      'only thank them at the end, not at the start',
+    );
     expect(buildSystemInstruction(sampleTask.scenario)).toContain(
       JSON.stringify(sampleTask.scenario),
     );
@@ -339,7 +348,10 @@ describe('RingioAdapter', () => {
       'Only if the customer says they are available',
     );
     expect(buildSystemInstruction(sampleTask.scenario)).toContain(
-      'do not ask again',
+      'acknowledge a callback time if they give one',
+    );
+    expect(buildSystemInstruction(sampleTask.scenario)).toContain(
+      'without asking again',
     );
   });
 
