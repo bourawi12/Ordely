@@ -7,7 +7,7 @@ export interface CallAttemptRecord {
   completedAt: Date | null;
 }
 
-const MAX_ATTEMPTS = 3;
+export const MAX_ATTEMPTS = 3;
 const RETRY_DELAYS_MS = [30 * 60_000, 2 * 60 * 60_000];
 
 export function nextAttemptNumber(
@@ -23,7 +23,7 @@ export function nextAttemptNumber(
   if (
     latest.attempt !== calls.length ||
     latest.attempt >= MAX_ATTEMPTS ||
-    !['no_answer', 'error'].includes(latest.disposition ?? '') ||
+    !['no_answer', 'error', 'ambiguous'].includes(latest.disposition ?? '') ||
     !latest.completedAt
   ) {
     return null;

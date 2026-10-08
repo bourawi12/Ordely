@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { CallOrchestratorService } from '../calls/orchestration/call-orchestrator.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { OrdersService } from './orders.service';
@@ -7,6 +8,7 @@ import { OrdersService } from './orders.service';
 describe('OrdersService', () => {
   let service: OrdersService;
   const prismaTransaction = jest.fn();
+  const callOrchestrator = { pollOnce: jest.fn() };
   const order = {
     findMany: jest.fn(),
     findFirst: jest.fn(),
@@ -21,6 +23,7 @@ describe('OrdersService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         OrdersService,
+        { provide: CallOrchestratorService, useValue: callOrchestrator },
         {
           provide: PrismaService,
           useValue: {
@@ -83,6 +86,7 @@ describe('OrdersService', () => {
       },
       include: { items: true },
     });
+    expect(callOrchestrator.pollOnce).toHaveBeenCalledTimes(1);
   });
 
   it('edits the fields of an order of the shop', async () => {
@@ -134,6 +138,20 @@ describe('OrdersService', () => {
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0].row).toBe(3);
     expect(prismaTransaction).toHaveBeenCalled();
+    expect(callOrchestrator.pollOnce).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not wake call polling when a CSV contains no valid rows', async () => {
+    const csvContent =
+      'customer,phone,item,quantity,total\n' +
+      'Bad Row,invalid-phone,Robe,1,120.5\n';
+
+    const result = await service.importCsv(7, Buffer.from(csvContent, 'utf-8'));
+
+    expect(result.imported).toBe(0);
+    expect(result.failed).toBe(1);
+    expect(prismaTransaction).not.toHaveBeenCalled();
+    expect(callOrchestrator.pollOnce).not.toHaveBeenCalled();
   });
 
   it('imports multi-item CSV rows with semicolon-separated items and quantities', async () => {
@@ -148,6 +166,7 @@ describe('OrdersService', () => {
     expect(result.imported).toBe(1);
     expect(result.failed).toBe(0);
     expect(prismaTransaction).toHaveBeenCalled();
+    expect(callOrchestrator.pollOnce).toHaveBeenCalledTimes(1);
   });
 });
 

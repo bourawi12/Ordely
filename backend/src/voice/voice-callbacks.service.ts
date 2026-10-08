@@ -27,7 +27,7 @@ import {
 
 /** Largest accepted recording (one speaker, one call), in bytes. */
 export const RECORDING_MAX_BYTES = 25 * 1024 * 1024;
-const DEFAULT_MIN_CONFIDENCE = 0.8;
+const DEFAULT_MIN_CONFIDENCE = 0.7;
 
 const speakerOf = (s: 'agent' | 'customer' | 'mobile'): 'agent' | 'customer' =>
   s === 'agent' ? 'agent' : 'customer';

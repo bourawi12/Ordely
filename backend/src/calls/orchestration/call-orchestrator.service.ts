@@ -24,6 +24,7 @@ export class CallOrchestratorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CallOrchestratorService.name);
   private timer: NodeJS.Timeout | null = null;
   private polling = false;
+  private pollRequested = false;
   private cursorId: number | undefined;
 
   constructor(
@@ -45,7 +46,10 @@ export class CallOrchestratorService implements OnModuleInit, OnModuleDestroy {
   }
 
   async pollOnce(): Promise<void> {
-    if (this.polling) return;
+    if (this.polling) {
+      this.pollRequested = true;
+      return;
+    }
     this.polling = true;
     try {
       const now = new Date();
@@ -127,6 +131,10 @@ export class CallOrchestratorService implements OnModuleInit, OnModuleDestroy {
       );
     } finally {
       this.polling = false;
+      if (this.pollRequested) {
+        this.pollRequested = false;
+        void this.pollOnce();
+      }
     }
   }
 }

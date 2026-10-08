@@ -2,9 +2,7 @@
 
 ## Purpose
 
-This document defines the ownership boundaries for the voice confirmation flow.
-
-Each layer has a distinct responsibility. The goal is to keep the call lifecycle, the customer conversation, and the business decision separate and auditable.
+This document defines ownership boundaries for the voice confirmation flow. Call lifecycle, customer conversation, policy enforcement, and database writes remain separate and auditable.
 
 ---
 
@@ -12,21 +10,20 @@ Each layer has a distinct responsibility. The goal is to keep the call lifecycle
 
 ### Responsibility
 
-Starts the confirmation call when a pending order needs attention.
+Starts confirmation calls for eligible pending orders.
 
 ### Owns
 
 - pending-order selection
-- task building
-- provider handoff
-- call dispatch state
-- retry and scheduling checks
+- task building and provider handoff
+- dispatch state
+- retry scheduling and call-window checks
 
 ### Does not own
 
 - the live customer conversation
-- final business interpretation
-- direct order mutation
+- order outcome interpretation
+- order mutation
 
 ### Output
 
@@ -42,28 +39,21 @@ Owns the live call session while it is active.
 
 ### Owns
 
-- session connection
-- call state tracking
-- transcript capture
+- session and call lifecycle
+- transcript and artifact capture
 - end-of-call detection
 - errors and timeouts
-- final session result payload
+- forwarding Maria's final structured result
 
 ### Does not own
 
-- final order status changes
+- customer intent
 - business policy decisions
-- customer intent validation beyond the session itself
+- order status changes
 
 ### Output
 
-A structured session result, such as:
-
-- no answer
-- ended normally
-- failed
-- conversation complete
-- ambiguous
+A completed call result, no answer, or technical failure.
 
 ---
 
@@ -71,66 +61,52 @@ A structured session result, such as:
 
 ### Responsibility
 
-Handles the customer-facing conversation.
+Handles the customer conversation and decides the customer's intent about the order.
 
 ### Owns
 
-- greeting
-- reading the order details
-- asking for confirmation
-- clarifying questions
-- detecting a clear customer outcome
-- signaling when the conversation is complete
+- greeting and reading order details
+- asking for explicit confirmation
+- asking one or two concise, non-repetitive clarification questions when needed
+- deciding whether the customer confirmed, declined, or remains unclear
+- telling the customer that the order is confirmed or cancelled
+- giving a brief goodbye, then reporting intent, confidence, and language
 
 ### Does not own
 
-- writing the order state
-- deciding whether the order is truly confirmed
-- deciding business policy outcomes
-- directly ending the provider call
+- confidence policy or order eligibility
+- database writes
+- direct control of the provider connection
 
 ### Output
 
-A semantic conversation outcome such as:
-
-- customer_confirmed
-- customer_declined
-- needs_more_context
-- customer_unreachable
-- ambiguous
+A structured result: CONFIRMED, CANCELLED, or UNCLEAR.
 
 ---
 
-## Layer 4: Nora
+## Layer 4: Backend decision policy
 
 ### Responsibility
 
-Decides the business consequence of the conversation.
+Validates Maria's structured result and determines the permitted next action.
 
 ### Owns
 
-- comparing the transcript to the real order
-- applying policy rules
-- checking confidence and clarity
-- deciding between confirm, decline, retry, or manual review
-- returning a validated next action
+- enforcing the configurable confidence threshold (default 0.7)
+- checking that the order is still pending
+- permitting confirmation or cancellation only for a clear, confident intent
+- retrying unresolved outcomes within the existing three-attempt policy
+- routing only an unresolved final attempt for human review
 
 ### Does not own
 
-- opening the call
-- managing the live media session
-- speaking to the customer
-- directly writing the order row without a backend service
+- the customer conversation
+- speech interpretation by a second AI agent
+- telephony lifecycle management
 
 ### Output
 
-A validated decision such as:
-
-- confirmed
-- cancelled
-- retry_later
-- manual_review_required
-- policy_blocked
+A validated action: confirm, cancel, retry, review, or policy blocked.
 
 ---
 
@@ -138,20 +114,19 @@ A validated decision such as:
 
 ### Responsibility
 
-Applies the validated decision to the real order record.
+Applies an allowed decision to the real order record.
 
 ### Owns
 
 - order status mutation
-- audit logs
-- review queue updates
-- any persisted order-side side effects
+- audit logs and review reasons
+- persisted order-side effects
 
 ### Does not own
 
 - the customer conversation
 - realtime telephony state
-- the voice script itself
+- the voice script
 
 ### Output
 
@@ -161,24 +136,16 @@ A persisted order state change with traceability.
 
 ## Boundary rule
 
-The following are the core rules of the design:
+1. Orchestration selects and starts the call.
+2. Runtime owns the call connection and forwards the result.
+3. Maria decides customer intent and speaks the outcome before closing.
+4. Backend policy validates confidence and eligibility, then handles retry or review.
+5. The order write service persists only an allowed change.
 
-1. The orchestration layer starts the call.
-2. The runtime layer owns the call session and result.
-3. Maria owns the conversation.
-4. Nora owns the business decision.
-5. The final order service owns the database mutation.
-
-No layer should bypass this chain without a clear reason.
+No layer should bypass this chain.
 
 ---
 
 ## Why this matters
 
-This separation prevents the system from mixing:
-
-- customer conversation logic
-- telephony lifecycle logic
-- business-safe state changes
-
-It makes the flow explicit, easier to debug, and safer for real operations.
+This separation keeps conversation logic, telephony lifecycle, and business-safe state changes clear, testable, and auditable.

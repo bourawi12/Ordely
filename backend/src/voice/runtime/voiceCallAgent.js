@@ -43,6 +43,7 @@ class VoiceCallAgent {
     };
     this.taskId = taskId;
     this.ordelyClient = ordelyClient;
+    this.decision = null;
     this.transcriptSequence = 0;
     this.startTime = null;
     this.socket = null;
@@ -252,10 +253,36 @@ class VoiceCallAgent {
         this.onStatus('live');
         this.logger.info('Introduction played. Mobile speech forwarding to Gemini is enabled.');
       }
+      if (this.decision && !this.closing) await this.stop();
+    } else if (event.type === 'decision') {
+      this.recordDecision(event);
     } else if (event.type === 'session-expiring') {
       this.logger.warn(`Gemini Live session is expiring in ${event.timeLeft || 'an unknown interval'}.`);
     } else if (event.type === 'error' || event.type === 'closed') {
       this.fail(event.error || new Error('Gemini Live session closed.'));
+    }
+  }
+
+  recordDecision({ id, name, args = {} }) {
+    const intents = ['CONFIRMED', 'CANCELLED', 'UNCLEAR'];
+    const languages = ['FRENCH', 'ENGLISH', 'TUNISIAN_ARABIC', 'MIXED'];
+    if (!this.decision) {
+      this.decision = {
+        intent: intents.includes(args.intent) ? args.intent : 'UNCLEAR',
+        confidence:
+          typeof args.confidence === 'number' &&
+          Number.isFinite(args.confidence) &&
+          args.confidence >= 0 &&
+          args.confidence <= 1
+            ? args.confidence
+            : 0,
+        language: languages.includes(args.language) ? args.language : undefined,
+      };
+    }
+    try {
+      this.gemini?.acknowledgeTool?.(id, name);
+    } catch (error) {
+      this.logger.warn(`Could not acknowledge Maria's decision: ${error.message}`);
     }
   }
 
@@ -315,7 +342,7 @@ class VoiceCallAgent {
           ? 'no_answer'
           : this.finishPhase === 'error'
             ? 'error'
-            : 'needs_human';
+            : 'completed';
       const durationSeconds = this.startTime
         ? Math.round((Date.now() - this.startTime) / 1000)
         : 0;
@@ -324,6 +351,7 @@ class VoiceCallAgent {
         providerCallId: this.callId,
         disposition,
         durationSeconds,
+        ...(this.decision || {}),
       }).catch((err) => this.logger.error('Ordely result callback error:', err.message));
     }
     this.finished = true;

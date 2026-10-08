@@ -355,7 +355,7 @@ describe('RingioAdapter', () => {
     );
   });
 
-  it('sends a normally ended call to human review instead of confirming it', async () => {
+  it('reports a normally ended call without inventing a decision', async () => {
     const orderlyClient = {
       sendEvent: jest.fn().mockResolvedValue(undefined),
       sendResult: jest.fn().mockResolvedValue(undefined),
@@ -377,7 +377,8 @@ describe('RingioAdapter', () => {
     await agent.cleanup('Call ended.');
 
     expect(orderlyClient.sendResult).toHaveBeenCalledWith(
-      expect.objectContaining({ disposition: 'needs_human' }),
+      expect.objectContaining({ disposition: 'completed' }),
     );
+    expect(orderlyClient.sendResult.mock.calls[0][0].intent).toBeUndefined();
   });
 });

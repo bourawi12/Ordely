@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Order } from '@prisma/client';
+import { CallOrchestratorService } from '../calls/orchestration/call-orchestrator.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -43,6 +44,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeService: RealtimeService,
+    private readonly callOrchestrator: CallOrchestratorService,
   ) {}
 
   findAll(boutiqueId: number, status?: OrderStatus): Promise<Order[]> {
@@ -97,6 +99,7 @@ export class OrdersService {
       status: created.status,
       createdAt: created.createdAt.toISOString(),
     });
+    void this.callOrchestrator.pollOnce();
 
     return created;
   }
@@ -286,6 +289,7 @@ export class OrdersService {
         status: 'imported',
         createdAt: new Date().toISOString(),
       });
+      void this.callOrchestrator.pollOnce();
     }
 
     return {

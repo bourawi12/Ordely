@@ -74,8 +74,11 @@ class OrdelyCallbackClient {
   async sendResult({
     taskId,
     providerCallId,
-    disposition = 'confirmed',
+    disposition = 'completed',
     durationSeconds,
+    intent,
+    confidence,
+    language,
     error,
   }) {
     if (!this.enabled || !taskId) return;
@@ -91,6 +94,9 @@ class OrdelyCallbackClient {
           providerCallId,
           disposition,
           durationSeconds,
+          intent,
+          confidence,
+          language,
           timestamp: new Date().toISOString(),
           error,
         }),
