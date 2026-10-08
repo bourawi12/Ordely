@@ -7,6 +7,7 @@ const LABELS: Record<CallStatus | OrderStatus, string> = {
   failed: "Failed",
   no_answer: "No-answer",
   cancelled: "Cancelled",
+  unreachable: "Unreachable",
 };
 
 export default function StatusBadge({ status }: { status: CallStatus | OrderStatus }) {

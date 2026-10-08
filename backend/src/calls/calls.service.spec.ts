@@ -6,6 +6,7 @@ describe('CallsService queue policy', () => {
   let prisma: {
     order: { findFirst: jest.Mock; findMany: jest.Mock };
     call: { create: jest.Mock; createMany: jest.Mock };
+    $transaction: jest.Mock;
   };
   let realtime: { emitCallStatusChanged: jest.Mock };
 
@@ -25,6 +26,7 @@ describe('CallsService queue policy', () => {
         }),
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      $transaction: jest.fn(),
     };
     realtime = { emitCallStatusChanged: jest.fn() };
     service = new CallsService(
@@ -87,6 +89,39 @@ describe('CallsService queue policy', () => {
 
     await expect(service.queue(1, 50)).rejects.toThrow(ConflictException);
     expect(prisma.call.create).not.toHaveBeenCalled();
+  });
+
+  it('reopens an unreachable order and queues a manual retry', async () => {
+    const tx = {
+      order: {
+        findFirst: jest.fn().mockResolvedValue({
+          status: 'unreachable',
+          calls: [{ status: 'failed', attempt: 3, disposition: 'needs_human' }],
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      call: {
+        create: jest.fn().mockResolvedValue({
+          id: 23,
+          orderId: 50,
+          status: 'pending',
+          attempt: 4,
+          createdAt: new Date(),
+        }),
+      },
+    };
+    prisma.$transaction.mockImplementation((callback) => callback(tx));
+
+    await service.retryAfterReview(1, 50);
+
+    expect(tx.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 50, boutiqueId: 1, status: 'unreachable' },
+      data: { status: 'pending' },
+    });
+    expect(tx.call.create).toHaveBeenCalledWith({
+      data: { orderId: 50, attempt: 4 },
+      include: expect.any(Object),
+    });
   });
 
   it('bulk-queues only eligible orders and skips duplicate inserts', async () => {

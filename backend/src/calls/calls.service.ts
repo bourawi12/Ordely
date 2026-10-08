@@ -298,6 +298,58 @@ export class CallsService {
     return { queued: result.count };
   }
 
+  /** Moves a human-reviewed unreachable order back into the normal call queue. */
+  async retryAfterReview(boutiqueId: number, orderId: number) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, boutiqueId },
+        select: {
+          status: true,
+          calls: {
+            select: { status: true, attempt: true, disposition: true },
+            orderBy: { attempt: 'desc' },
+          },
+        },
+      });
+      if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+      if (order.status !== 'unreachable') {
+        throw new ConflictException(
+          `Order ${orderId} is not ready for a manual retry`,
+        );
+      }
+      if (order.calls.some((call) => call.status === 'pending')) {
+        throw new ConflictException(`A call is already queued for order ${orderId}`);
+      }
+      const latest = order.calls[0];
+      if (!latest || latest.disposition !== 'needs_human') {
+        throw new ConflictException(
+          `Order ${orderId} does not have a call awaiting human review`,
+        );
+      }
+
+      const attempt = Math.max(...order.calls.map((call) => call.attempt)) + 1;
+      const reopened = await tx.order.updateMany({
+        where: { id: orderId, boutiqueId, status: 'unreachable' },
+        data: { status: 'pending' },
+      });
+      if (reopened.count === 0) {
+        throw new ConflictException(`Order ${orderId} changed before retry`);
+      }
+      return tx.call.create({
+        data: { orderId, attempt },
+        include: withOrder,
+      });
+    });
+
+    this.realtimeService.emitCallStatusChanged(boutiqueId, {
+      callId: result.id,
+      orderId: result.orderId,
+      status: result.status,
+      updatedAt: result.createdAt.toISOString(),
+    });
+    return result;
+  }
+
   async usage(boutiqueId: number) {
     const since = await startOf(this.prisma, 'month', this.timezone);
     const used = await this.prisma.call.count({

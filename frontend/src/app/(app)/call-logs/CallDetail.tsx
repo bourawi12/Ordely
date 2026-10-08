@@ -2,7 +2,7 @@ import Link from "next/link";
 import Icon, { type IconName } from "@/components/Icon";
 import ui from "@/components/app/ui.module.css";
 import type { CallDetail as Detail, CallStatus } from "@/lib/api";
-import { formatDuration, formatTND } from "@/lib/format";
+import { formatDateTime, formatDuration, formatTND } from "@/lib/format";
 import styles from "./call-logs.module.css";
 
 const MAX_ATTEMPTS = 3;
@@ -55,6 +55,12 @@ export default function CallDetail({ call }: { call: Detail | null }) {
       <dl className={styles.facts}>
         <dt>Duration</dt>
         <dd>{formatDuration(call.durationSeconds)}</dd>
+        <dt>Queued</dt>
+        <dd>{formatDateTime(call.createdAt)}</dd>
+        <dt>Started</dt>
+        <dd>{call.dispatchedAt ? formatDateTime(call.dispatchedAt) : "—"}</dd>
+        <dt>Completed</dt>
+        <dd>{call.completedAt ? formatDateTime(call.completedAt) : "—"}</dd>
         <dt>Language</dt>
         <dd>{call.language ?? "—"}</dd>
         <dt>Attempts</dt>
@@ -63,6 +69,8 @@ export default function CallDetail({ call }: { call: Detail | null }) {
         </dd>
         <dt>Order value</dt>
         <dd>{formatTND(call.order.total)}</dd>
+        <dt>Transport</dt>
+        <dd>{call.transportPhase ?? "—"}</dd>
       </dl>
 
       {call.transcript && call.transcript.length > 0 ? (

@@ -12,7 +12,12 @@ import {
   Min,
 } from 'class-validator';
 
-export const ORDER_STATUSES = ['pending', 'confirmed', 'cancelled'] as const;
+export const ORDER_STATUSES = [
+  'pending',
+  'confirmed',
+  'cancelled',
+  'unreachable',
+] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 const trim = ({ value }: { value: unknown }) =>

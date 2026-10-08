@@ -14,6 +14,7 @@ const FILTERS: { value?: OrderStatus; label: string }[] = [
   { value: "pending", label: "Pending" },
   { value: "confirmed", label: "Confirmed" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "unreachable", label: "Unreachable" },
 ];
 
 export default async function OrdersPage({
@@ -24,10 +25,40 @@ export default async function OrdersPage({
   const raw = (await searchParams).status;
   const status = FILTERS.find((f) => f.value && f.value === raw)?.value;
   const orders = await api.listOrders(status);
+  const totalValue = orders.reduce((sum, order) => sum + Number(order.total), 0);
+  const totalCalls = orders.reduce((sum, order) => sum + (order.callCount ?? 0), 0);
+  const pendingCount = orders.filter((order) => order.status === "pending").length;
 
   return (
     <div className={styles.layout}>
       <section className={`${ui.card} ${styles.tableCard}`}>
+        <div className={styles.pageHead}>
+          <div>
+            <p className={styles.eyebrow}>Order queue</p>
+            <h1 className={styles.pageTitle}>Orders</h1>
+          </div>
+          <p className={styles.pageContext}>
+            {status ? `${status[0].toUpperCase()}${status.slice(1)} orders` : "All orders"}
+          </p>
+        </div>
+        <div className={styles.summaryGrid} aria-label="Order summary">
+          <div className={styles.summaryItem}>
+            <span className={styles.summaryLabel}>Visible orders</span>
+            <strong className={styles.summaryValue}>{orders.length}</strong>
+          </div>
+          <div className={styles.summaryItem}>
+            <span className={styles.summaryLabel}>Awaiting confirmation</span>
+            <strong className={styles.summaryValue}>{pendingCount}</strong>
+          </div>
+          <div className={styles.summaryItem}>
+            <span className={styles.summaryLabel}>Order value</span>
+            <strong className={styles.summaryValue}>{formatTND(totalValue)}</strong>
+          </div>
+          <div className={styles.summaryItem}>
+            <span className={styles.summaryLabel}>Call attempts</span>
+            <strong className={styles.summaryValue}>{totalCalls}</strong>
+          </div>
+        </div>
         <div className={styles.headerRow}>
           <nav className={styles.tabs} aria-label="Filter by status">
             {FILTERS.map((f) => (
@@ -61,6 +92,8 @@ export default async function OrdersPage({
                   <th>Item</th>
                   <th>Total</th>
                   <th>Status</th>
+                  <th>Calls</th>
+                  <th>Next call</th>
                   <th>Placed</th>
                 </tr>
               </thead>
@@ -74,12 +107,19 @@ export default async function OrdersPage({
                     <td className={ui.muted}>{order.phone || "—"}</td>
                     <td>
                       {order.items && order.items.length > 0 ? (
-                        order.items.map((item, idx) => (
-                          <div key={item.id || idx}>
-                            {item.productName}
-                            <span className={ui.muted}> × {item.quantity}</span>
-                          </div>
-                        ))
+                        <div className={styles.itemList}>
+                          {order.items.slice(0, 2).map((item, idx) => (
+                            <div key={item.id || idx}>
+                              {item.productName}
+                              <span className={ui.muted}> × {item.quantity}</span>
+                            </div>
+                          ))}
+                          {order.items.length > 2 && (
+                            <span className={`${ui.muted} ${styles.moreItems}`}>
+                              +{order.items.length - 2} more
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         "—"
                       )}
@@ -87,6 +127,14 @@ export default async function OrdersPage({
                     <td className={ui.strong}>{formatTND(order.total)}</td>
                     <td>
                       <StatusBadge status={order.status} />
+                    </td>
+                    <td className={ui.muted}>{order.callCount ?? 0}</td>
+                    <td>
+                      {order.nextCallAt ? (
+                        <span className={styles.nextCall}>{formatDateTime(order.nextCallAt)}</span>
+                      ) : (
+                        <span className={ui.muted}>—</span>
+                      )}
                     </td>
                     <td className={ui.muted}>{formatDateTime(order.createdAt)}</td>
                   </tr>

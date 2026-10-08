@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { api, ApiError, type CallWithOrder } from "@/lib/api";
+import { api, ApiError, type CallDetail } from "@/lib/api";
 import VoiceLabClient from "./VoiceLabClient";
 
 export const metadata: Metadata = {
@@ -29,7 +29,7 @@ export default async function VoiceLabPage({
   }));
 
   const selectedId = callParam ?? data.items[0]?.id;
-  let selectedCall: (CallWithOrder & { attempts: number }) | null = null;
+  let selectedCall: CallDetail | null = null;
 
   if (selectedId) {
     selectedCall = await api.getCall(selectedId).catch((err) => {

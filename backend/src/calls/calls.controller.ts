@@ -66,6 +66,11 @@ export class CallsController {
     return this.callsService.queue(boutiqueId, dto.orderId);
   }
 
+  @Post('retry')
+  retry(@CurrentBoutique() boutiqueId: number, @Body() dto: QueueCallDto) {
+    return this.callsService.retryAfterReview(boutiqueId, dto.orderId);
+  }
+
   @Post('queue-pending')
   queueAllPending(@CurrentBoutique() boutiqueId: number) {
     return this.callsService.queueAllPending(boutiqueId);

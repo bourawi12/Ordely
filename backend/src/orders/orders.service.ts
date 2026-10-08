@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Order } from '@prisma/client';
 import { CallOrchestratorService } from '../calls/orchestration/call-orchestrator.service';
+import { nextAttemptAt } from '../calls/orchestration/call-orchestration-policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -47,12 +48,32 @@ export class OrdersService {
     private readonly callOrchestrator: CallOrchestratorService,
   ) {}
 
-  findAll(boutiqueId: number, status?: OrderStatus): Promise<Order[]> {
-    return this.prisma.order.findMany({
+  async findAll(boutiqueId: number, status?: OrderStatus) {
+    const orders = await this.prisma.order.findMany({
       where: status ? { boutiqueId, status } : { boutiqueId },
-      include: { items: true },
+      include: {
+        items: true,
+        calls: {
+          select: {
+            status: true,
+            attempt: true,
+            disposition: true,
+            completedAt: true,
+            createdAt: true,
+          },
+          orderBy: { attempt: 'desc' },
+        },
+      },
       orderBy: { id: 'desc' },
     });
+
+    return orders.map(({ calls, ...order }) => ({
+      ...order,
+      callCount: calls.length,
+      nextCallAt:
+        calls.find((call) => call.status === 'pending')?.createdAt ??
+        (order.status === 'pending' ? nextAttemptAt(calls) : null),
+    }));
   }
 
   async findOne(boutiqueId: number, id: number) {

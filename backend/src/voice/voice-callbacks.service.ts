@@ -24,6 +24,7 @@ import {
   mergeTranscript,
   TranscriptPart,
 } from './voice.rules';
+import { MAX_ATTEMPTS } from '../calls/orchestration/call-orchestration-policy';
 
 /** Largest accepted recording (one speaker, one call), in bytes. */
 export const RECORDING_MAX_BYTES = 25 * 1024 * 1024;
@@ -176,6 +177,11 @@ export class VoiceCallbacksService {
         await tx.order.updateMany({
           where: { id: call.orderId, status: 'pending' },
           data: { status: outcome },
+        });
+      } else if (call.attempt >= MAX_ATTEMPTS) {
+        await tx.order.updateMany({
+          where: { id: call.orderId, status: 'pending' },
+          data: { status: 'unreachable' },
         });
       }
       return true;

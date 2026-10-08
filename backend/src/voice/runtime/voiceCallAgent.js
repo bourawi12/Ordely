@@ -44,6 +44,7 @@ class VoiceCallAgent {
     this.taskId = taskId;
     this.ordelyClient = ordelyClient;
     this.decision = null;
+    this.endCallRequested = false;
     this.transcriptSequence = 0;
     this.startTime = null;
     this.socket = null;
@@ -253,9 +254,16 @@ class VoiceCallAgent {
         this.onStatus('live');
         this.logger.info('Introduction played. Mobile speech forwarding to Gemini is enabled.');
       }
-      if (this.decision && !this.closing) await this.stop();
+      if (this.decision && this.endCallRequested && !this.closing) await this.stop();
     } else if (event.type === 'decision') {
       this.recordDecision(event);
+    } else if (event.type === 'end-call') {
+      this.endCallRequested = true;
+      try {
+        this.gemini?.acknowledgeTool?.(event.id, event.name);
+      } catch (error) {
+        this.logger.warn(`Could not acknowledge Maria's end-call signal: ${error.message}`);
+      }
     } else if (event.type === 'session-expiring') {
       this.logger.warn(`Gemini Live session is expiring in ${event.timeLeft || 'an unknown interval'}.`);
     } else if (event.type === 'error' || event.type === 'closed') {

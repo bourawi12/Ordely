@@ -27,6 +27,17 @@ export async function queueCall(orderId: number): Promise<QueueState> {
   return { message: "Call queued" };
 }
 
+export async function retryCall(orderId: number): Promise<QueueState> {
+  try {
+    await api.retryCall(orderId);
+  } catch (err) {
+    unstable_rethrow(err);
+    return { error: err instanceof ApiError ? err.message : "Could not retry the call" };
+  }
+  refresh(orderId);
+  return { message: "Retry queued" };
+}
+
 export async function queueAllPending(): Promise<QueueState> {
   try {
     const { queued } = await api.queueAllPending();

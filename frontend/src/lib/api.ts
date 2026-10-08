@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionToken } from "./session";
 import type { ThemeMode } from "./theme";
 
-export type OrderStatus = "pending" | "confirmed" | "cancelled";
+export type OrderStatus = "pending" | "confirmed" | "cancelled" | "unreachable";
 export type CallStatus = "pending" | "confirmed" | "failed" | "no_answer";
 export type CallRange = "today" | "7d" | "30d" | "all";
 
@@ -24,6 +24,8 @@ export interface Order {
   status: OrderStatus;
   createdAt: string;
   items?: OrderItem[];
+  callCount?: number;
+  nextCallAt?: string | null;
 }
 
 export interface TranscriptLine {
@@ -74,7 +76,7 @@ export interface Call {
 }
 
 /** One call with its order and, for voice agent calls, signed links to each speaker's audio. */
-export type CallDetail = CallWithOrder & {
+export type CallDetail = Omit<CallWithOrder, "recordings"> & {
   attempts: number;
   recordings?: { agent: string | null; customer: string | null };
 };
@@ -413,6 +415,8 @@ completeOnboarding: () =>
     (await send(`/calls/export${query({ ...filters })}`, undefined, true)).text(),
   queueCall: (orderId: number) =>
     request<Call>("/calls", { method: "POST", body: JSON.stringify({ orderId }) }),
+  retryCall: (orderId: number) =>
+    request<Call>("/calls/retry", { method: "POST", body: JSON.stringify({ orderId }) }),
   queueAllPending: () =>
     request<{ queued: number }>("/calls/queue-pending", { method: "POST" }),
   dispatchCall: (id: number) =>
