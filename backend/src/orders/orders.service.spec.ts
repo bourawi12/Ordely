@@ -49,9 +49,49 @@ describe('OrdersService', () => {
     await service.findAll(7);
     expect(order.findMany).toHaveBeenCalledWith({
       where: { boutiqueId: 7 },
-      include: { items: true },
+      include: {
+        items: true,
+        calls: {
+          select: {
+            status: true,
+            attempt: true,
+            disposition: true,
+            completedAt: true,
+            createdAt: true,
+          },
+          orderBy: { attempt: 'desc' },
+        },
+      },
       orderBy: { id: 'desc' },
     });
+  });
+
+  it('summarizes attempts and the next retry time', async () => {
+    const completedAt = new Date('2026-10-08T10:00:00.000Z');
+    order.findMany.mockResolvedValue([
+      {
+        id: 1,
+        status: 'pending',
+        calls: [
+          {
+            status: 'no_answer',
+            attempt: 1,
+            disposition: 'no_answer',
+            completedAt,
+            createdAt: new Date('2026-10-08T09:00:00.000Z'),
+          },
+        ],
+      },
+    ]);
+
+    await expect(service.findAll(7)).resolves.toEqual([
+      {
+        id: 1,
+        status: 'pending',
+        callCount: 1,
+        nextCallAt: new Date('2026-10-08T10:30:00.000Z'),
+      },
+    ]);
   });
 
   it('creates an order in the shop', async () => {

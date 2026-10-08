@@ -52,7 +52,7 @@ The system should retry when:
 
 ### Manual review
 
-Human review is reserved for an unresolved third attempt. On each call, Maria may ask one or two concise clarifying questions. If intent is still unclear or confidence is below 0.7, keep the order unchanged and schedule the next allowed attempt. After attempt three, keep the order pending and mark the call for staff review with a reason.
+Human review is reserved for an unresolved third attempt. On each call, Maria may ask one or two concise clarifying questions. If intent is still unclear or confidence is below 0.7, schedule the next allowed attempt. After attempt three, mark the call for staff review and move the order to `unreachable`; a shop operator may explicitly reopen it for another call.
 
 ---
 

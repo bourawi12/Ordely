@@ -17,17 +17,21 @@ describe('GeminiLiveSession decision reporting', () => {
     const live = await GeminiLiveSession.connect({ client, scenario });
     const instruction = options.config.systemInstruction;
 
-    expect(options.config.tools[0].functionDeclarations[0].name).toBe('report_decision');
+    expect(options.config.tools.map((tool: any) => tool.functionDeclarations[0].name)).toEqual([
+      'report_decision',
+      'end_call',
+    ]);
     expect(instruction).toContain('one or two brief, natural clarifying questions');
     expect(instruction).toContain('say plainly that the order is confirmed or cancelled');
-    expect(instruction).toContain('After your spoken closing, call report_decision exactly once');
+    expect(instruction).toContain('call report_decision exactly once');
+    expect(instruction).toContain('then call end_call exactly once');
 
     live.acknowledgeTool('tool-1', 'report_decision');
     expect(session.sendToolResponse).toHaveBeenCalledWith({
       functionResponses: [{
         id: 'tool-1',
         name: 'report_decision',
-        response: { result: 'Decision recorded. Do not speak further.' },
+        response: { result: 'Decision recorded. Complete the customer-facing closing before calling end_call.' },
       }],
     });
   });
@@ -50,6 +54,17 @@ describe('GeminiLiveSession decision reporting', () => {
         args: { intent: 'CONFIRMED', confidence: 0.9, language: 'TUNISIAN_ARABIC' },
       },
       { type: 'turn-complete' },
+    ]);
+  });
+
+  it('normalizes end_call as a separate terminal signal', () => {
+    expect(normalizeLiveMessage({
+      toolCall: {
+        functionCalls: [{ id: 'tool-2', name: 'end_call', args: {} }],
+      },
+      serverContent: {},
+    })).toEqual([
+      { type: 'end-call', id: 'tool-2', name: 'end_call', args: {} },
     ]);
   });
 });

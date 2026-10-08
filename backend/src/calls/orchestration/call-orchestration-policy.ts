@@ -10,12 +10,10 @@ export interface CallAttemptRecord {
 export const MAX_ATTEMPTS = 3;
 const RETRY_DELAYS_MS = [30 * 60_000, 2 * 60 * 60_000];
 
-export function nextAttemptNumber(
+export function nextAttemptAt(
   calls: CallAttemptRecord[],
-  now = new Date(),
-): number | null {
-  if (calls.length >= MAX_ATTEMPTS) return null;
-  if (calls.length === 0) return 1;
+): Date | null {
+  if (calls.length === 0) return null;
 
   const latest = calls.reduce((current, call) =>
     call.attempt > current.attempt ? call : current,
@@ -29,10 +27,20 @@ export function nextAttemptNumber(
     return null;
   }
 
-  const retryDelay = RETRY_DELAYS_MS[latest.attempt - 1];
-  return now.getTime() >= latest.completedAt.getTime() + retryDelay
-    ? latest.attempt + 1
-    : null;
+  return new Date(
+    latest.completedAt.getTime() + RETRY_DELAYS_MS[latest.attempt - 1],
+  );
+}
+
+export function nextAttemptNumber(
+  calls: CallAttemptRecord[],
+  now = new Date(),
+): number | null {
+  if (calls.length >= MAX_ATTEMPTS) return null;
+  if (calls.length === 0) return 1;
+
+  const attemptAt = nextAttemptAt(calls);
+  return attemptAt && now >= attemptAt ? calls.length + 1 : null;
 }
 
 export function isWithinCallWindow(

@@ -161,7 +161,7 @@ A review path is:
 
 - call ends
 - customer says something unclear or contradictory
-- Maria remains unclear through attempt three; backend marks the final call for review and leaves the order pending
+- Maria remains unclear through attempt three; backend marks the final call for review and moves the order to `unreachable`
 - the call log shows `needs_human` and the reason for staff follow-up
 
 ---

@@ -160,7 +160,7 @@ describe('CallCallbackService', () => {
     expect(prismaMock.order.updateMany).not.toHaveBeenCalled();
   });
 
-  it('routes an unresolved final attempt to human review without changing the order', async () => {
+  it('routes an unresolved final attempt to human review and marks the order unreachable', async () => {
     prismaMock.call.findUnique.mockResolvedValue({ ...sampleCall, attempt: 3 });
 
     const result = await service.handleResult({
@@ -173,7 +173,25 @@ describe('CallCallbackService', () => {
 
     expect(result).toMatchObject({ status: 'failed', disposition: 'needs_human' });
     expect(result.failureReason).toContain('final call attempt');
-    expect(prismaMock.order.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 50, status: 'pending' },
+      data: { status: 'unreachable' },
+    });
+  });
+
+  it('marks an unanswered final attempt as unreachable', async () => {
+    prismaMock.call.findUnique.mockResolvedValue({ ...sampleCall, attempt: 3 });
+
+    await service.handleResult({
+      taskId: 'task-1234-uuid',
+      disposition: 'no_answer',
+      timestamp: new Date().toISOString(),
+    });
+
+    expect(prismaMock.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 50, status: 'pending' },
+      data: { status: 'unreachable' },
+    });
   });
 
   it('throws NotFoundException if taskId does not exist', async () => {

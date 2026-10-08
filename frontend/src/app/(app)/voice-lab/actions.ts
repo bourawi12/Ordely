@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { api, type Call, type CallWithOrder } from "@/lib/api";
+import { api, type Call, type CallDetail } from "@/lib/api";
 
 export async function dispatchCallAction(callId: number): Promise<{ success: boolean; call?: Call; error?: string }> {
   try {
@@ -65,7 +65,7 @@ export async function createTestOrderAndQueueAction(data: {
 
 export async function getCallDetailsAction(
   callId: number,
-): Promise<{ success: boolean; call?: CallWithOrder & { attempts: number }; error?: string }> {
+): Promise<{ success: boolean; call?: CallDetail; error?: string }> {
   try {
     const call = await api.getCall(callId);
     return { success: true, call };

@@ -24,7 +24,7 @@ describe('VoiceCallAgent decision reporting', () => {
     return { agent, bridge, gemini, order };
   }
 
-  it('acknowledges Maria and hangs up only after final audio drains', async () => {
+  it('waits for Maria to signal end_call after reporting the decision', async () => {
     const { agent, bridge, gemini, order } = createAgent();
     const args = { intent: 'CONFIRMED', confidence: 0.9, language: 'TUNISIAN_ARABIC' };
 
@@ -34,9 +34,14 @@ describe('VoiceCallAgent decision reporting', () => {
     expect(agent.stop).not.toHaveBeenCalled();
 
     await agent.handleGeminiEvent({ type: 'turn-complete' });
+    expect(agent.stop).not.toHaveBeenCalled();
 
-    expect(bridge.flushOutput).toHaveBeenCalledTimes(1);
-    expect(order).toEqual(['flush', 'drained', 'hangup']);
+    await agent.handleGeminiEvent({ type: 'end-call', id: 'tool-2', name: 'end_call', args: {} });
+    expect(gemini.acknowledgeTool).toHaveBeenCalledWith('tool-2', 'end_call');
+    await agent.handleGeminiEvent({ type: 'turn-complete' });
+
+    expect(bridge.flushOutput).toHaveBeenCalledTimes(2);
+    expect(order).toEqual(['flush', 'drained', 'flush', 'drained', 'hangup']);
   });
 
   it('fails closed on invalid intent or confidence', () => {

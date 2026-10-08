@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Icon from "@/components/Icon";
 import StatusBadge from "@/components/StatusBadge";
-import { CallNowButton } from "@/components/app/CallButtons";
+import { CallNowButton, RetryCallButton } from "@/components/app/CallButtons";
 import ui from "@/components/app/ui.module.css";
 import { api, ApiError } from "@/lib/api";
 import { formatDateTime, formatDuration, formatTND } from "@/lib/format";
@@ -25,6 +25,7 @@ export default async function OrderPage({
     throw err;
   });
   const queued = order.calls.some((c) => c.status === "pending");
+  const needsReview = order.calls.some((c) => c.disposition === "needs_human");
 
   return (
     <>
@@ -37,6 +38,15 @@ export default async function OrderPage({
             <h2 className={ui.cardTitle}>Order #{order.id}</h2>
             <StatusBadge status={order.status} />
           </div>
+          {needsReview && (
+            <div className={styles.reviewBanner} role="status">
+              <strong>Needs review</strong>
+              <span>
+                Three attempts ended without a clear customer decision. You can
+                ask Ordely to try again.
+              </span>
+            </div>
+          )}
           <EditableOrder order={order}>
             <dl className={styles.facts}>
               <dt>Customer</dt>
@@ -59,11 +69,16 @@ export default async function OrderPage({
               <dd>{formatTND(order.total)}</dd>
               <dt>Placed</dt>
               <dd>{formatDateTime(order.createdAt)}</dd>
+              <dt>Call attempts</dt>
+              <dd>{order.calls.length} / 3</dd>
             </dl>
           </EditableOrder>
           <div className={styles.actions}>
             {order.status === "pending" && (
               <CallNowButton orderId={order.id} queued={queued} />
+            )}
+            {order.status === "unreachable" && (
+              <RetryCallButton orderId={order.id} />
             )}
             {order.status !== "confirmed" && (
               <form action={setOrderStatus.bind(null, order.id, "confirmed")}>
@@ -103,7 +118,9 @@ export default async function OrderPage({
                   <tr>
                     <th>Attempt</th>
                     <th>Time</th>
+                    <th>Started</th>
                     <th>Status</th>
+                    <th>Outcome</th>
                     <th>Duration</th>
                     <th>Language</th>
                   </tr>
@@ -121,9 +138,13 @@ export default async function OrderPage({
                       <td className={ui.muted}>
                         {formatDateTime(call.createdAt)}
                       </td>
+                      <td className={ui.muted}>
+                        {call.dispatchedAt ? formatDateTime(call.dispatchedAt) : "—"}
+                      </td>
                       <td>
                         <StatusBadge status={call.status} />
                       </td>
+                      <td className={ui.muted}>{call.disposition?.replaceAll("_", " ") ?? "—"}</td>
                       <td className={ui.muted}>
                         {formatDuration(call.durationSeconds)}
                       </td>

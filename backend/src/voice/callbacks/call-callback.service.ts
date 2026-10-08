@@ -83,13 +83,13 @@ export class CallCallbackService {
       status = 'failed';
       disposition = 'declined';
       failureReason = 'Customer declined the order';
-    } else if (outcome === 'no_answer') {
-      status = result.disposition === 'error' ? 'failed' : 'no_answer';
-      failureReason = result.error || 'No answer from customer';
     } else if (call.attempt >= MAX_ATTEMPTS) {
       status = 'failed';
       disposition = 'needs_human';
-      failureReason = 'Customer intent remained unclear after the final call attempt';
+      failureReason = 'Customer could not be reached or did not provide a clear decision after the final call attempt';
+    } else if (outcome === 'no_answer') {
+      status = result.disposition === 'error' ? 'failed' : 'no_answer';
+      failureReason = result.error || 'No answer from customer';
     } else {
       status = 'failed';
       disposition = 'ambiguous';
@@ -128,6 +128,11 @@ export class CallCallbackService {
             data: { status, disposition, failureReason },
           });
         }
+      } else if (call.attempt >= MAX_ATTEMPTS) {
+        await tx.order.updateMany({
+          where: { id: call.orderId, status: 'pending' },
+          data: { status: 'unreachable' },
+        });
       }
       return true;
     });

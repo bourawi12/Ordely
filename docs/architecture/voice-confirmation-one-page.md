@@ -149,7 +149,7 @@ Does not own:
 3. Maria tells the customer whether the order is confirmed or cancelled, says goodbye, then reports intent, confidence, and language.
 4. The runtime waits for her final audio to drain, ends the call, and sends the result to Ordely.
 5. Backend policy checks confidence (at least 0.7) and that the order remains pending before updating it.
-6. Unclear results retry after 30 minutes and then two hours; an unresolved third attempt is marked `needs_human` and the order stays pending.
+6. Unclear results retry after 30 minutes and then two hours; an unresolved third attempt is marked `needs_human` and the order becomes `unreachable` until an operator explicitly retries it.
 
 ---
 
