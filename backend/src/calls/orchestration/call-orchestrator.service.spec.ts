@@ -162,4 +162,21 @@ describe('CallOrchestratorService', () => {
     expect(prisma.call.create).not.toHaveBeenCalled();
     expect(dispatcher.dispatchCall).toHaveBeenCalledWith(1, 101);
   });
+
+  it('runs one follow-up poll when a wake arrives during an active poll', async () => {
+    let finishFirstPoll!: (orders: typeof order[]) => void;
+    prisma.order.findMany
+      .mockImplementationOnce(
+        () => new Promise((resolve) => { finishFirstPoll = resolve; }),
+      )
+      .mockResolvedValue([]);
+
+    const firstPoll = service.pollOnce();
+    await service.pollOnce();
+    await service.pollOnce();
+    finishFirstPoll([]);
+    await firstPoll;
+
+    expect(prisma.order.findMany).toHaveBeenCalledTimes(2);
+  });
 });

@@ -50,17 +50,22 @@ export interface VoiceCallEvent {
 }
 
 export type VoiceDisposition =
+  | 'completed'
   | 'confirmed'
   | 'declined'
   | 'no_answer'
   | 'ambiguous'
   | 'needs_human'
+  | 'policy_blocked'
   | 'error';
 
 export interface VoiceCallResult {
   taskId: string;
   providerCallId?: string;
   disposition: VoiceDisposition;
+  intent?: 'CONFIRMED' | 'CANCELLED' | 'UNCLEAR';
+  confidence?: number;
+  language?: 'FRENCH' | 'ENGLISH' | 'TUNISIAN_ARABIC' | 'MIXED';
   durationSeconds?: number;
   timestamp: string;
   error?: string;

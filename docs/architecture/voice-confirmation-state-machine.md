@@ -32,40 +32,36 @@ The call can move through a lifecycle like this:
 - speaking -> ended
 - speaking -> failed
 - speaking -> no_answer
-- speaking -> needs_human_review
-- ended -> completed
+- ended -> completed (Maria reports a structured decision after her spoken closing)
 
 ### Notes
 
 - A call should not move directly from queued to confirmed.
 - The business outcome is not the same thing as the communication state.
 - The runtime session decides the call-level transition.
-- The decision layer decides the business-level outcome.
+- Maria reports customer intent; backend policy validates whether it can change the order.
+- An unclear result is retried through three attempts; only an unresolved third attempt requires human review.
 
 ---
 
 ## Order confirmation states
 
-The order should also be represented explicitly:
+Persisted order states are:
 
 - pending
-- awaiting_confirmation
 - confirmed
 - cancelled
-- retry_scheduled
-- manual_review_required
 
 ### Typical transitions
 
-- pending -> awaiting_confirmation
-- awaiting_confirmation -> confirmed
-- awaiting_confirmation -> cancelled
-- awaiting_confirmation -> retry_scheduled
-- awaiting_confirmation -> manual_review_required
+- pending -> confirmed after a clear, confident confirmation
+- pending -> cancelled after a clear, confident decline
+- pending -> pending while unresolved attempts are retried
+- pending -> pending when the final unresolved call is marked for staff review
 
 ### Important rule
 
-Order mutation should happen only after the decision layer has processed the call result and validated that the outcome meets policy.
+Order mutation happens only after backend policy validates Maria's intent at or above 0.7 confidence and confirms the order is still pending.
 
 ---
 
@@ -102,11 +98,10 @@ The final decisions should be explicit and not left to guesswork.
 
 Examples:
 
-- customer_confirmed
-- customer_declined
-- customer_unreachable
-- ambiguous_response
-- requires_manual_review
+- CONFIRMED
+- CANCELLED
+- UNCLEAR (retry until attempt three)
+- needs_human (only after an unresolved third attempt)
 - policy_blocked
 
 These decisions are not the same as call phases. A call can be ended normally while still requiring manual review.

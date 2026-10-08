@@ -25,6 +25,14 @@ export default function CallDetail({ call }: { call: Detail | null }) {
   }
 
   const look = LOOK[call.status];
+  const statusLabel =
+    call.disposition === "policy_blocked"
+      ? "Not applied"
+      : call.disposition === "needs_human"
+      ? "Needs review"
+      : call.disposition === "ambiguous"
+        ? "Unclear, retrying"
+        : look.label;
   const reply = call.transcript?.findLast((l) => l.speaker === "customer");
 
   return (
@@ -35,12 +43,14 @@ export default function CallDetail({ call }: { call: Detail | null }) {
           <Icon name={look.icon} size={30} />
         </span>
         <h3>
-          <Link href={`/orders/${call.order.id}`}>Order #{call.order.id}</Link> — {look.label}
+          <Link href={`/orders/${call.order.id}`}>Order #{call.order.id}</Link> — {statusLabel}
         </h3>
         <p>
           {call.order.customer} · {call.order.phone || "no phone"}
         </p>
       </div>
+
+      {call.failureReason && <p className={ui.muted}>{call.failureReason}</p>}
 
       <dl className={styles.facts}>
         <dt>Duration</dt>

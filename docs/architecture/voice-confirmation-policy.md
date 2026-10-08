@@ -16,9 +16,9 @@ A confirmation decision should require all of the following when possible:
 - the response matches the order details
 - the order is still valid and still pending
 - the call outcome is not a failure or timeout
-- the confidence is high enough for an automatic decision
+- Maria reports a clear intent with confidence of at least 0.7
 
-If any of these checks fail, the system should avoid an automatic order change and route the case to a safer state.
+If any check fails, do not change the order. Retry unclear or below-threshold results automatically; human review is reserved for an unresolved third attempt.
 
 ---
 
@@ -52,13 +52,7 @@ The system should retry when:
 
 ### Manual review
 
-The system should require review when:
-
-- the customer speaks ambiguously
-- the transcript contains conflicting statements
-- the customer asks for a different item, quantity, or delivery detail
-- the order total or item details do not match the conversation
-- the call result is incomplete or low-confidence
+Human review is reserved for an unresolved third attempt. On each call, Maria may ask one or two concise clarifying questions. If intent is still unclear or confidence is below 0.7, keep the order unchanged and schedule the next allowed attempt. After attempt three, keep the order pending and mark the call for staff review with a reason.
 
 ---
 
@@ -68,21 +62,18 @@ The policy layer should return a structured result such as:
 
 ```json
 {
-  "decision": "confirmed",
+  "disposition": "completed",
+  "intent": "CONFIRMED",
   "confidence": 0.94,
-  "reason": "Customer explicitly confirmed the order details",
-  "requiresManualReview": false,
-  "nextAction": "update_order_status"
+  "language": "TUNISIAN_ARABIC"
 }
 ```
 
-Other valid decision values include:
-
-- declined
-- retry_later
-- no_answer
-- ambiguous
-- human_review_required
+Backend-derived outcomes include:
+- confirmed
+- cancelled
+- ambiguous (retryable before attempt three)
+- needs_human (after an unresolved third attempt)
 - policy_blocked
 
 ---

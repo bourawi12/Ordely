@@ -69,6 +69,36 @@ describe('call orchestration policy', () => {
     ).toBe(3);
   });
 
+  it('retries ambiguous decisions through attempt 3, then stops', () => {
+    expect(
+      nextAttemptNumber(
+        [{ attempt: 1, status: 'failed', disposition: 'ambiguous', completedAt }],
+        new Date(completedAt.getTime() + 30 * 60_000),
+      ),
+    ).toBe(2);
+    expect(
+      nextAttemptNumber(
+        [
+          { attempt: 1, status: 'failed', disposition: 'ambiguous', completedAt },
+          {
+            attempt: 2,
+            status: 'failed',
+            disposition: 'ambiguous',
+            completedAt: new Date(completedAt.getTime() + 30 * 60_000),
+          },
+        ],
+        new Date(completedAt.getTime() + 150 * 60_000),
+      ),
+    ).toBe(3);
+    expect(
+      nextAttemptNumber([
+        { attempt: 1, status: 'failed', disposition: 'ambiguous', completedAt },
+        { attempt: 2, status: 'failed', disposition: 'ambiguous', completedAt },
+        { attempt: 3, status: 'failed', disposition: 'needs_human', completedAt },
+      ]),
+    ).toBeNull();
+  });
+
   it('does not retry incomplete, active, or human-review calls', () => {
     expect(
       nextAttemptNumber(
