@@ -31,6 +31,7 @@ export class DashboardService {
     const [
       totalOrders,
       confirmedOrders,
+      cancelledOrders,
       failedCalls,
       avgDuration,
       week,
@@ -48,6 +49,14 @@ export class DashboardService {
         (createdAt) =>
           this.prisma.order.count({
             where: { boutiqueId, createdAt, status: 'confirmed' },
+          }),
+        current,
+        previous,
+      ),
+      this.metric(
+        (createdAt) =>
+          this.prisma.order.count({
+            where: { boutiqueId, createdAt, status: 'cancelled' },
           }),
         current,
         previous,
@@ -99,7 +108,13 @@ export class DashboardService {
     ]);
 
     return {
-      stats: { totalOrders, confirmedOrders, failedCalls, avgDuration },
+      stats: {
+        totalOrders,
+        confirmedOrders,
+        cancelledOrders,
+        failedCalls,
+        avgDuration,
+      },
       week,
       recentCalls,
       pendingOrders: pendingOrders.map(({ calls, ...order }) => ({

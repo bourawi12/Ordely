@@ -61,6 +61,12 @@ export default async function DashboardPage() {
           change={percentChange(stats.confirmedOrders.value, stats.confirmedOrders.previous)}
         />
         <StatCard
+          label="Cancelled orders"
+          href="/orders?status=cancelled"
+          value={formatNumber(stats.cancelledOrders.value)}
+          change={percentChange(stats.cancelledOrders.value, stats.cancelledOrders.previous)}
+        />
+        <StatCard
           label="Failed / No answer"
           href="/call-logs?range=30d&status=failed"
           value={formatNumber(stats.failedCalls.value)}

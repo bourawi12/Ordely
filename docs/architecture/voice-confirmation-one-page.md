@@ -157,7 +157,7 @@ Does not own:
 
 Persisted call statuses are pending, confirmed, failed, and no_answer. A `needs_human` disposition is a final review marker after attempt three; an `ambiguous` disposition remains retryable before then.
 
-Persisted order statuses are pending, confirmed, and cancelled. Retries and final review leave the order pending.
+Persisted order statuses are pending, confirmed, cancelled, and unreachable. Retries leave the order pending; final review marks it unreachable.
 
 ---
 
