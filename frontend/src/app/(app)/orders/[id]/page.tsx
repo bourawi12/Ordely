@@ -132,7 +132,7 @@ export default async function OrderPage({
                     </div>
                     <p>{formatDateTime(call.createdAt)} · {call.dispatchedAt ? `started ${formatDateTime(call.dispatchedAt)}` : "not started"}</p>
                     <span className={ui.muted}>
-                      {call.disposition?.replaceAll("_", " ") ?? "No outcome yet"} · {formatDuration(call.durationSeconds)} · {call.language ?? "language not set"}
+                      {call.disposition?.replaceAll("_", " ") ?? "No outcome yet"} · {formatDuration(call.durationSeconds)} · {call.language ?? "Darija"}
                     </span>
                     {call.failureReason && <span className={styles.timelineReason}>{call.failureReason}</span>}
                   </div>

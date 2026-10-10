@@ -60,7 +60,7 @@ describe('VoiceCallAgent decision reporting', () => {
       args: { intent: 'MAYBE', confidence: 1.2, language: 'OTHER' },
     });
 
-    expect(agent.decision).toEqual({ intent: 'UNCLEAR', confidence: 0, language: undefined });
+    expect(agent.decision).toEqual({ intent: 'UNCLEAR', confidence: 0, language: 'TUNISIAN_ARABIC' });
   });
 
   it('acknowledges silence with a Tunisian Derja prompt and resets the watchdog', async () => {
@@ -97,7 +97,7 @@ describe('VoiceCallAgent decision reporting', () => {
     expect(timers[0].delay).toBe(240000);
     await timers[0].callback();
 
-    expect(agent.decision).toEqual({ intent: 'UNCLEAR', confidence: 0, language: undefined });
+    expect(agent.decision).toEqual({ intent: 'UNCLEAR', confidence: 0, language: 'TUNISIAN_ARABIC' });
     expect(agent.finish).toHaveBeenCalledWith('Maximum call duration reached.', 'timeout');
   });
 });

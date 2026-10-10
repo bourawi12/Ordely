@@ -2,7 +2,12 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { VoiceCallEvent, VoiceCallResult } from '../voice.types';
-import { decideOutcome, LANGUAGE_LABELS, LanguageCode } from '../voice.rules';
+import {
+  DEFAULT_LANGUAGE_LABEL,
+  decideOutcome,
+  LANGUAGE_LABELS,
+  LanguageCode,
+} from '../voice.rules';
 import { MAX_ATTEMPTS } from '../../calls/orchestration/call-orchestration-policy';
 
 const DEFAULT_MIN_CONFIDENCE = 0.7;
@@ -102,9 +107,9 @@ export class CallCallbackService {
         data: {
           disposition,
           durationSeconds: result.durationSeconds ?? call.durationSeconds,
-          ...(result.language
-            ? { language: LANGUAGE_LABELS[result.language as LanguageCode] }
-            : {}),
+          language: result.language
+            ? LANGUAGE_LABELS[result.language as LanguageCode]
+            : DEFAULT_LANGUAGE_LABEL,
           completedAt: result.timestamp ? new Date(result.timestamp) : new Date(),
           status,
           failureReason,

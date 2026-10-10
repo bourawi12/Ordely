@@ -298,7 +298,7 @@ export class CallsService {
     return { queued: result.count };
   }
 
-  /** Moves a human-reviewed unreachable order back into the normal call queue. */
+  /** Moves an unreachable order back into the normal call queue. */
   async retryAfterReview(boutiqueId: number, orderId: number) {
     const result = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
@@ -320,10 +320,9 @@ export class CallsService {
       if (order.calls.some((call) => call.status === 'pending')) {
         throw new ConflictException(`A call is already queued for order ${orderId}`);
       }
-      const latest = order.calls[0];
-      if (!latest || latest.disposition !== 'needs_human') {
+      if (order.calls.length === 0) {
         throw new ConflictException(
-          `Order ${orderId} does not have a call awaiting human review`,
+          `Order ${orderId} does not have a completed call to retry`,
         );
       }
 

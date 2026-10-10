@@ -20,6 +20,7 @@ import {
   CALL_STATUS,
   callIdFrom,
   decideOutcome,
+  DEFAULT_LANGUAGE_LABEL,
   LANGUAGE_LABELS,
   LanguageCode,
   mergeTranscript,
@@ -171,14 +172,14 @@ export class VoiceCallbacksService {
     const outcome = decideOutcome(dto, this.minConfidence);
     const language = dto.language
       ? LANGUAGE_LABELS[dto.language as LanguageCode]
-      : undefined;
+      : DEFAULT_LANGUAGE_LABEL;
     const transition = await this.prisma.$transaction(async (tx) => {
       const { count } = await tx.call.updateMany({
         where: { id: call.id, status: 'pending' },
         data: {
           status: CALL_STATUS[outcome],
           durationSeconds: dto.durationSeconds ?? null,
-          ...(language && { language }),
+          language,
           ...(dto.providerCallId &&
             !call.providerCallId && { providerCallId: dto.providerCallId }),
         },

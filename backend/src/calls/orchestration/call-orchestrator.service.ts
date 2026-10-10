@@ -18,6 +18,7 @@ import {
 
 const POLL_INTERVAL_MS = 30_000;
 const POLL_BATCH_SIZE = 100;
+const STALE_CALL_TIMEOUT_MS = 10 * 60_000;
 
 @Injectable()
 export class CallOrchestratorService implements OnModuleInit, OnModuleDestroy {
@@ -53,6 +54,7 @@ export class CallOrchestratorService implements OnModuleInit, OnModuleDestroy {
     this.polling = true;
     try {
       const now = new Date();
+      await this.expireStaleCalls(now);
       const orders = await this.prisma.order.findMany({
         where: { status: 'pending' },
         select: {
@@ -134,6 +136,34 @@ export class CallOrchestratorService implements OnModuleInit, OnModuleDestroy {
       if (this.pollRequested) {
         this.pollRequested = false;
         void this.pollOnce();
+      }
+    }
+  }
+
+  private async expireStaleCalls(now: Date): Promise<void> {
+    const staleCalls = await this.prisma.call.findMany({
+      where: {
+        status: 'pending',
+        dispatchedAt: { lt: new Date(now.getTime() - STALE_CALL_TIMEOUT_MS) },
+      },
+      select: { id: true, orderId: true, attempt: true },
+    });
+
+    for (const call of staleCalls) {
+      const result = await this.prisma.call.updateMany({
+        where: { id: call.id, status: 'pending' },
+        data: {
+          status: 'no_answer',
+          disposition: 'no_answer',
+          completedAt: now,
+          failureReason: 'Voice call timed out without a result',
+        },
+      });
+      if (result.count > 0 && call.attempt >= 3) {
+        await this.prisma.order.updateMany({
+          where: { id: call.orderId, status: 'pending' },
+          data: { status: 'unreachable' },
+        });
       }
     }
   }

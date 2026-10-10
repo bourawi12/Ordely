@@ -81,6 +81,17 @@ describe('VoiceCallbacksService realtime publishing', () => {
     );
   });
 
+  it('stores Darija when the agent omits a language', async () => {
+    await service.result({
+      taskId: 'call-101',
+      disposition: 'no_answer',
+    });
+
+    expect(prisma.call.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ language: 'Darija' }) }),
+    );
+  });
+
   it('does not publish an ignored result', async () => {
     prisma.call.updateMany.mockResolvedValueOnce({ count: 0 });
 

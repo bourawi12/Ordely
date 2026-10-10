@@ -7,8 +7,8 @@ describe('CallOrchestratorService', () => {
   let service: CallOrchestratorService;
   let voiceAgent: FakeVoiceAgentClient;
   let prisma: {
-    order: { findMany: jest.Mock };
-    call: { create: jest.Mock };
+    order: { findMany: jest.Mock; updateMany: jest.Mock };
+    call: { create: jest.Mock; findMany: jest.Mock; updateMany: jest.Mock };
   };
   let dispatcher: { dispatchCall: jest.Mock };
 
@@ -23,8 +23,15 @@ describe('CallOrchestratorService', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-10-07T10:00:00.000Z'));
     voiceAgent = new FakeVoiceAgentClient();
     prisma = {
-      order: { findMany: jest.fn().mockResolvedValue([order]) },
-      call: { create: jest.fn().mockResolvedValue({ id: 101 }) },
+      order: {
+        findMany: jest.fn().mockResolvedValue([order]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      call: {
+        create: jest.fn().mockResolvedValue({ id: 101 }),
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
     };
     dispatcher = {
       dispatchCall: jest.fn().mockResolvedValue({ status: 'pending' }),
@@ -163,6 +170,55 @@ describe('CallOrchestratorService', () => {
     expect(dispatcher.dispatchCall).toHaveBeenCalledWith(1, 101);
   });
 
+  it('closes stale calls and makes the next attempt eligible', async () => {
+    prisma.call.findMany.mockResolvedValue([
+      { id: 100, orderId: 50, attempt: 1 },
+    ]);
+    prisma.order.findMany.mockResolvedValue([
+      {
+        ...order,
+        calls: [
+          {
+            id: 100,
+            attempt: 1,
+            status: 'no_answer',
+            disposition: 'no_answer',
+            completedAt: new Date('2026-10-07T09:00:00.000Z'),
+            dispatchedAt: new Date('2026-10-07T08:00:00.000Z'),
+            taskId: 'prior-task',
+          },
+        ],
+      },
+    ]);
+
+    await service.pollOnce();
+
+    expect(prisma.call.updateMany).toHaveBeenCalledWith({
+      where: { id: 100, status: 'pending' },
+      data: expect.objectContaining({
+        status: 'no_answer',
+        disposition: 'no_answer',
+      }),
+    });
+    expect(prisma.call.create).toHaveBeenCalledWith({
+      data: { orderId: 50, attempt: 2 },
+      select: { id: true },
+    });
+  });
+
+  it('marks a stale final attempt unreachable', async () => {
+    prisma.call.findMany.mockResolvedValue([
+      { id: 100, orderId: 50, attempt: 3 },
+    ]);
+
+    await service.pollOnce();
+
+    expect(prisma.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 50, status: 'pending' },
+      data: { status: 'unreachable' },
+    });
+  });
+
   it('runs one follow-up poll when a wake arrives during an active poll', async () => {
     let finishFirstPoll!: (orders: typeof order[]) => void;
     prisma.order.findMany
@@ -176,6 +232,7 @@ describe('CallOrchestratorService', () => {
     await service.pollOnce();
     finishFirstPoll([]);
     await firstPoll;
+    await Promise.resolve();
 
     expect(prisma.order.findMany).toHaveBeenCalledTimes(2);
   });

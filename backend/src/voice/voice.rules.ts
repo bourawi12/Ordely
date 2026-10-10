@@ -14,6 +14,7 @@ export const LANGUAGE_LABELS = {
   MIXED: 'Mixed',
 } as const;
 export type LanguageCode = keyof typeof LANGUAGE_LABELS;
+export const DEFAULT_LANGUAGE_LABEL = LANGUAGE_LABELS.TUNISIAN_ARABIC;
 
 /**
  * What a finished call means:

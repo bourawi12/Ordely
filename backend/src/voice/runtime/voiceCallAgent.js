@@ -300,7 +300,7 @@ class VoiceCallAgent {
           args.confidence <= 1
             ? args.confidence
             : 0,
-        language: languages.includes(args.language) ? args.language : undefined,
+        language: languages.includes(args.language) ? args.language : 'TUNISIAN_ARABIC',
       };
       this.clearCustomerSilenceTimer();
     }
@@ -437,7 +437,7 @@ class VoiceCallAgent {
 
   async forceUnclear(reason) {
     if (this.closing || this.finished || this.decision) return;
-    this.decision = { intent: 'UNCLEAR', confidence: 0, language: undefined };
+    this.decision = { intent: 'UNCLEAR', confidence: 0, language: 'TUNISIAN_ARABIC' };
     this.endCallRequested = true;
     this.logger.warn(reason);
     if (this.callId && this.socket?.connected) this.socket.emit('call:end', { callId: this.callId });
