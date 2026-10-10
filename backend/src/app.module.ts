@@ -11,6 +11,7 @@ import { BoutiqueModule } from './boutique/boutique.module';
 import { CallsModule } from './calls/calls.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { MailModule } from './mail/mail.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RealtimeModule } from './realtime/realtime.module';
@@ -26,6 +27,7 @@ import { VoiceModule } from './voice/voice.module';
     PrismaModule,
     StorageModule,
     MailModule,
+    IntegrationsModule,
     AuthModule,
     BoutiqueModule,
     OrdersModule,

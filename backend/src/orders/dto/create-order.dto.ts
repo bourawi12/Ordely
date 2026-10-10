@@ -42,4 +42,14 @@ export class CreateOrderDto {
   @Min(0)
   @Max(1_000_000)
   total?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  source?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  externalOrderId?: string;
 }

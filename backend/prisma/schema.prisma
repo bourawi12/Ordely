@@ -18,6 +18,8 @@ model Order {
   /// Order value in TND (3 decimals for millimes).
   total      Decimal     @default(0) @db.Decimal(10, 3)
   status     String      @default("pending") @db.VarChar(20)
+  source     String?     @db.VarChar(30)
+  externalOrderId String? @db.VarChar(120)
   createdAt  DateTime    @default(now()) @db.Timestamptz(6)
   items      OrderItem[]
   calls      Call[]
@@ -27,6 +29,7 @@ model Order {
   @@index([boutiqueId, createdAt])
   @@index([status])
   @@index([createdAt])
+  @@unique([boutiqueId, externalOrderId])
   @@map("orders")
 }
 
@@ -194,12 +197,30 @@ model Boutique {
   createdAt             DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   users                 User[]
+  integration           Integration?
   orders                Order[]
   payments              Payment[]
   reclamations          Reclamation[]
 
   @@index([createdAt])
   @@map("boutiques")
+}
+
+model Integration {
+  id             Int      @id @default(autoincrement())
+  boutiqueId     Int      @unique
+  boutique       Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  name           String   @default("Custom website") @db.VarChar(100)
+  apiKeyHash     String   @unique @db.VarChar(64)
+  apiKeyPrefix   String   @db.VarChar(20)
+  webhookUrl     String?  @db.VarChar(500)
+  webhookSecret  String   @db.VarChar(100)
+  enabled        Boolean  @default(true)
+  lastTestedAt   DateTime? @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt
+
+  @@map("integrations")
 }
 
 /// A support issue submitted by a merchant account.

@@ -8,6 +8,7 @@ import { CallOrchestratorService } from '../calls/orchestration/call-orchestrato
 import { nextAttemptAt } from '../calls/orchestration/call-orchestration-policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { IntegrationWebhookService } from '../integrations/integration-webhook.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus, UpdateOrderDto } from './dto/update-order.dto';
 
@@ -46,6 +47,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly realtimeService: RealtimeService,
     private readonly callOrchestrator: CallOrchestratorService,
+    private readonly integrationWebhook: IntegrationWebhookService,
   ) {}
 
   async findAll(boutiqueId: number, status?: OrderStatus) {
@@ -104,6 +106,8 @@ export class OrdersService {
         phone: dto.phone,
         total: computedTotal,
         boutiqueId,
+        ...(dto.source ? { source: dto.source } : {}),
+        ...(dto.externalOrderId ? { externalOrderId: dto.externalOrderId } : {}),
         items: {
           create: dto.items.map((i) => ({
             productName: i.productName,
@@ -142,6 +146,7 @@ export class OrdersService {
         status: updated.status,
         updatedAt: new Date().toISOString(),
       });
+      void this.integrationWebhook.notifyOrderStatus(boutiqueId, updated.id, updated.status);
     }
     return updated;
   }

@@ -214,6 +214,17 @@ export interface Boutique {
   onboarding: { completed: boolean; nextStep: 1 | 2 | 3 };
 }
 
+export interface Integration {
+  id: number;
+  name: string;
+  apiKeyPrefix: string;
+  webhookUrl: string | null;
+  enabled: boolean;
+  lastTestedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Plan {
   code: string;
   label: string;
@@ -404,6 +415,21 @@ changePassword: (data: {
   }),
 
 boutique: () => request<Boutique>("/boutique"),
+  getIntegration: () => request<Integration | null>("/integrations"),
+  createIntegration: (data: { webhookUrl?: string }) =>
+    request<{ integration: Integration; apiKey: string; webhookSecret: string }>("/integrations", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateIntegration: (data: { webhookUrl?: string; enabled?: boolean }) =>
+    request<Integration>("/integrations", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  testIntegration: () =>
+    request<{ ok: true; integration: Integration }>("/integrations/test", {
+      method: "POST",
+    }),
 
 updateBoutique: (
   section: BoutiqueSection,

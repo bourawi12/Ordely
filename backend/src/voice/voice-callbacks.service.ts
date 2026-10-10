@@ -27,6 +27,7 @@ import {
   TranscriptPart,
 } from './voice.rules';
 import { MAX_ATTEMPTS } from '../calls/orchestration/call-orchestration-policy';
+import { IntegrationWebhookService } from '../integrations/integration-webhook.service';
 
 /** Largest accepted recording (one speaker, one call), in bytes. */
 export const RECORDING_MAX_BYTES = 25 * 1024 * 1024;
@@ -49,6 +50,7 @@ export class VoiceCallbacksService {
     private readonly storage: StorageService,
     private readonly config: ConfigService,
     private readonly realtimeService: RealtimeService,
+    private readonly integrationWebhook: IntegrationWebhookService,
   ) {}
 
   private get minConfidence() {
@@ -216,6 +218,7 @@ export class VoiceCallbacksService {
           status: transition.orderStatus,
           updatedAt,
         });
+        void this.integrationWebhook.notifyOrderStatus(call.order.boutiqueId, call.orderId, transition.orderStatus);
       }
     }
     this.logger.log(

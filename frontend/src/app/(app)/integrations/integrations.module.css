@@ -1,0 +1,43 @@
+.page { display: grid; gap: 1.5rem; max-width: 920px; padding: 1.5rem; }
+.pageHead { display: flex; justify-content: space-between; align-items: start; gap: 2rem; padding: .5rem 0 1.5rem; }
+.eyebrow { margin: 0 0 .5rem; color: var(--accent); font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.pageHead h1 { max-width: 640px; margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.05; }
+.intro { max-width: 620px; margin: 1rem 0 0; color: var(--muted); font-size: 1.02rem; line-height: 1.65; }
+.heroIcon { display: grid; place-items: center; width: 64px; height: 64px; flex: 0 0 auto; border-radius: 16px; background: var(--accent-soft); color: var(--accent); }
+.connected { background: var(--success-bg); color: var(--success-text); }
+.steps, .credentials, .settingsCard, .testCard { padding: 1.5rem; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.step, .sectionTitle { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+.step { padding-bottom: 1.3rem; border-bottom: 1px solid var(--border); }
+.step > span { color: var(--accent); font: 700 .78rem var(--font-mono); }
+.step h2, .sectionTitle h2, .testCard h2 { margin: 0; font-size: 1.2rem; }
+.step p, .testCard p { margin: .5rem 0 0; color: var(--muted); line-height: 1.55; }
+.setupForm { display: grid; gap: 1rem; margin-top: 1.3rem; }
+.setupForm label { display: grid; gap: .45rem; color: var(--muted); font-size: .88rem; font-weight: 600; }
+.setupForm input { width: 100%; padding: .75rem .85rem; border: 1px solid var(--border); border-radius: 10px; background: var(--app-bg); color: var(--text); font: inherit; }
+.setupForm input:focus { border-color: var(--accent); outline: 2px solid var(--accent-soft); }
+.primaryButton, .secondaryButton, .copyButton { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 600; }
+.primaryButton { width: fit-content; padding: .7rem 1rem; border: 0; background: var(--accent); color: var(--accent-text); }
+.secondaryButton { width: fit-content; padding: .65rem 1rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.primaryButton:disabled, .secondaryButton:disabled { cursor: wait; opacity: .55; }
+.sectionTitle { margin-bottom: 1.2rem; }
+.credentials { display: grid; gap: 1rem; }
+.warning { display: flex; align-items: center; gap: .6rem; padding: .75rem .9rem; border-radius: 10px; background: var(--pending-bg); color: var(--pending-text); font-size: .85rem; }
+.secretField { display: grid; gap: .45rem; }
+.fieldLabel { display: flex; align-items: center; gap: .45rem; color: var(--muted); font-size: .82rem; font-weight: 600; }
+.copyRow { display: flex; align-items: center; gap: .5rem; min-width: 0; padding: .5rem .5rem .5rem .8rem; border: 1px solid var(--border); border-radius: 10px; background: var(--app-bg); }
+.copyRow code { min-width: 0; overflow: hidden; color: var(--text); font: .8rem var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.copyButton { flex: 0 0 auto; padding: .45rem .7rem; border: 0; background: var(--accent-soft); color: var(--accent); font-size: .8rem; }
+.testCard { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; }
+.testCard form { display: grid; gap: .6rem; justify-items: end; }
+.message { margin: 0; font-size: .85rem; }
+.success { color: var(--success-text); }
+.error { color: var(--danger); }
+.guide { padding: 1rem 1.2rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.guide button { display: inline-flex; align-items: center; gap: .45rem; border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; font-weight: 600; }
+.guide p { margin: .9rem 0 0; color: var(--muted); line-height: 1.6; }
+.guide pre { overflow-x: auto; margin: 1rem 0 0; padding: 1rem; border-radius: 10px; background: var(--app-bg); color: var(--text); font: .78rem/1.6 var(--font-mono); white-space: pre-wrap; }
+.help { position: relative; display: inline-block; z-index: 3; }
+.help summary { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid var(--accent); border-radius: 50%; color: var(--accent); cursor: pointer; font-size: .7rem; list-style: none; }
+.help summary::-webkit-details-marker { display: none; }
+.help span { position: absolute; top: 25px; right: 0; width: 235px; padding: .75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 12%); color: var(--text); font-size: .78rem; font-weight: 400; line-height: 1.5; }
+@media (max-width: 700px) { .page { padding: 1rem; } .pageHead, .testCard { flex-direction: column; } .heroIcon { width: 48px; height: 48px; } .step, .sectionTitle { align-items: start; } .testCard form { justify-items: start; } }
