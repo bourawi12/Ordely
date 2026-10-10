@@ -1,12 +1,34 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { VoiceCallEvent, VoiceCallResult } from '../voice.types';
+import {
+  DEFAULT_LANGUAGE_LABEL,
+  decideOutcome,
+  LANGUAGE_LABELS,
+  LanguageCode,
+} from '../voice.rules';
+import { MAX_ATTEMPTS } from '../../calls/orchestration/call-orchestration-policy';
+
+const DEFAULT_MIN_CONFIDENCE = 0.7;
 
 @Injectable()
 export class CallCallbackService {
   private readonly logger = new Logger(CallCallbackService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private get minConfidence() {
+    const value = Number(
+      this.config.get('VOICE_MIN_CONFIDENCE', DEFAULT_MIN_CONFIDENCE),
+    );
+    return Number.isFinite(value) && value > 0 && value <= 1
+      ? value
+      : DEFAULT_MIN_CONFIDENCE;
+  }
 
   async handleEvent(event: VoiceCallEvent) {
     const call = await this.prisma.call.findUnique({
@@ -54,48 +76,75 @@ export class CallCallbackService {
       throw new NotFoundException(`No call found with taskId ${result.taskId}`);
     }
 
-    let status = call.status;
-    let failureReason = call.failureReason;
+    const outcome = decideOutcome(result, this.minConfidence);
+    let status: string;
+    let disposition = result.disposition;
+    let failureReason: string | null = null;
 
-    switch (result.disposition) {
-      case 'confirmed':
-        status = 'confirmed';
-        break;
-      case 'declined':
-        status = 'failed';
-        failureReason = 'Customer declined the order';
-        break;
-      case 'no_answer':
-        status = 'no_answer';
-        failureReason = 'No answer from customer';
-        break;
-      case 'ambiguous':
-      case 'needs_human':
-        failureReason = `Call ended with disposition: ${result.disposition}. Requires manual review.`;
-        break;
-      case 'error':
-        status = 'failed';
-        failureReason = result.error || 'Voice agent execution error';
-        break;
+    if (outcome === 'confirmed') {
+      status = 'confirmed';
+      disposition = 'confirmed';
+    } else if (outcome === 'cancelled') {
+      status = 'failed';
+      disposition = 'declined';
+      failureReason = 'Customer declined the order';
+    } else if (call.attempt >= MAX_ATTEMPTS) {
+      status = 'failed';
+      disposition = 'needs_human';
+      failureReason = 'Customer could not be reached or did not provide a clear decision after the final call attempt';
+    } else if (outcome === 'no_answer') {
+      status = result.disposition === 'error' ? 'failed' : 'no_answer';
+      failureReason = result.error || 'No answer from customer';
+    } else {
+      status = 'failed';
+      disposition = 'ambiguous';
+      failureReason = 'Customer intent unclear; another call will be attempted';
     }
 
-    const updated = await this.prisma.call.update({
-      where: { id: call.id },
-      data: {
-        disposition: result.disposition,
-        durationSeconds: result.durationSeconds ?? call.durationSeconds,
-        completedAt: result.timestamp ? new Date(result.timestamp) : new Date(),
-        status,
-        failureReason,
-        ...(result.providerCallId
-          ? { providerCallId: result.providerCallId }
-          : {}),
-      },
+    const applied = await this.prisma.$transaction(async (tx) => {
+      const update = await tx.call.updateMany({
+        where: { id: call.id, status: 'pending' },
+        data: {
+          disposition,
+          durationSeconds: result.durationSeconds ?? call.durationSeconds,
+          language: result.language
+            ? LANGUAGE_LABELS[result.language as LanguageCode]
+            : DEFAULT_LANGUAGE_LABEL,
+          completedAt: result.timestamp ? new Date(result.timestamp) : new Date(),
+          status,
+          failureReason,
+          ...(result.providerCallId && !call.providerCallId
+            ? { providerCallId: result.providerCallId }
+            : {}),
+        },
+      });
+      if (update.count === 0) return false;
+      if (outcome === 'confirmed' || outcome === 'cancelled') {
+        const orderUpdate = await tx.order.updateMany({
+          where: { id: call.orderId, status: 'pending' },
+          data: { status: outcome },
+        });
+        if (orderUpdate.count === 0) {
+          status = 'failed';
+          disposition = 'policy_blocked';
+          failureReason = 'Order is no longer pending; Maria\'s decision was not applied';
+          await tx.call.update({
+            where: { id: call.id },
+            data: { status, disposition, failureReason },
+          });
+        }
+      } else if (call.attempt >= MAX_ATTEMPTS) {
+        await tx.order.updateMany({
+          where: { id: call.orderId, status: 'pending' },
+          data: { status: 'unreachable' },
+        });
+      }
+      return true;
     });
 
     this.logger.log(
-      `Call ${call.id} finished with disposition ${result.disposition} (status: ${status})`,
+      `Call ${call.id} finished with disposition ${disposition} (status: ${status})${applied ? '' : ' (already closed, ignored)'}`,
     );
-    return updated;
+    return { ok: true, status, disposition, failureReason, applied };
   }
 }

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import Icon, { type IconName } from "@/components/Icon";
 import ui from "@/components/app/ui.module.css";
-import type { CallStatus, CallWithOrder } from "@/lib/api";
-import { formatDuration, formatTND } from "@/lib/format";
+import type { CallDetail as Detail, CallStatus } from "@/lib/api";
+import { formatDateTime, formatDuration, formatTND } from "@/lib/format";
 import styles from "./call-logs.module.css";
 
 const MAX_ATTEMPTS = 3;
@@ -14,7 +14,7 @@ const LOOK: Record<CallStatus, { icon: IconName; label: string; color: string; b
   pending: { icon: "clock", label: "Pending", color: "var(--pending-text)", bg: "var(--pending-bg)" },
 };
 
-export default function CallDetail({ call }: { call: (CallWithOrder & { attempts: number }) | null }) {
+export default function CallDetail({ call }: { call: Detail | null }) {
   if (!call) {
     return (
       <aside className={`${ui.card} ${styles.detail}`}>
@@ -25,6 +25,14 @@ export default function CallDetail({ call }: { call: (CallWithOrder & { attempts
   }
 
   const look = LOOK[call.status];
+  const statusLabel =
+    call.disposition === "policy_blocked"
+      ? "Not applied"
+      : call.disposition === "needs_human"
+      ? "Needs review"
+      : call.disposition === "ambiguous"
+        ? "Unclear, retrying"
+        : look.label;
   const reply = call.transcript?.findLast((l) => l.speaker === "customer");
 
   return (
@@ -35,16 +43,24 @@ export default function CallDetail({ call }: { call: (CallWithOrder & { attempts
           <Icon name={look.icon} size={30} />
         </span>
         <h3>
-          <Link href={`/orders/${call.order.id}`}>Order #{call.order.id}</Link> — {look.label}
+          <Link href={`/orders/${call.order.id}`}>Order #{call.order.id}</Link> — {statusLabel}
         </h3>
         <p>
           {call.order.customer} · {call.order.phone || "no phone"}
         </p>
       </div>
 
+      {call.failureReason && <p className={ui.muted}>{call.failureReason}</p>}
+
       <dl className={styles.facts}>
         <dt>Duration</dt>
         <dd>{formatDuration(call.durationSeconds)}</dd>
+        <dt>Queued</dt>
+        <dd>{formatDateTime(call.createdAt)}</dd>
+        <dt>Started</dt>
+        <dd>{call.dispatchedAt ? formatDateTime(call.dispatchedAt) : "—"}</dd>
+        <dt>Completed</dt>
+        <dd>{call.completedAt ? formatDateTime(call.completedAt) : "—"}</dd>
         <dt>Language</dt>
         <dd>{call.language ?? "—"}</dd>
         <dt>Attempts</dt>
@@ -53,6 +69,8 @@ export default function CallDetail({ call }: { call: (CallWithOrder & { attempts
         </dd>
         <dt>Order value</dt>
         <dd>{formatTND(call.order.total)}</dd>
+        <dt>Transport</dt>
+        <dd>{call.transportPhase ?? "—"}</dd>
       </dl>
 
       {call.transcript && call.transcript.length > 0 ? (
@@ -84,7 +102,19 @@ export default function CallDetail({ call }: { call: (CallWithOrder & { attempts
         </p>
       )}
 
-      {call.recordingUrl ? (
+      {call.recordings?.customer && call.recordings.agent ? (
+        // Voice agent calls: one recording per side of the conversation.
+        <>
+          <span className={styles.recording}>
+            <Icon name="play" size={18} /> Customer
+          </span>
+          <audio className={styles.audio} controls preload="none" src={call.recordings.customer} />
+          <span className={styles.recording}>
+            <Icon name="play" size={18} /> Agent
+          </span>
+          <audio className={styles.audio} controls preload="none" src={call.recordings.agent} />
+        </>
+      ) : call.recordingUrl ? (
         <>
           <span className={styles.recording}>
             <Icon name="play" size={18} /> Play recording

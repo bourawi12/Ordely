@@ -27,6 +27,7 @@ exit /b 1
 echo Docker engine is ready.
 
 REM 2) Install dependencies from the lockfiles.
+if exist "%~dp0backend\node_modules\.bin\nest.cmd" if exist "%~dp0backend\node_modules\.bin\prisma.cmd" goto :backend_deps_ready
 echo Installing backend dependencies...
 pushd "%~dp0backend"
 call npm install --no-audit --no-fund
@@ -37,7 +38,10 @@ if errorlevel 1 (
     exit /b 1
 )
 popd
+:backend_deps_ready
+echo Backend dependencies are ready. Run npm install manually after changing its package files.
 
+if exist "%~dp0frontend\node_modules\.bin\next.cmd" goto :frontend_deps_ready
 echo Installing frontend dependencies...
 pushd "%~dp0frontend"
 call npm install --no-audit --no-fund
@@ -48,6 +52,8 @@ if errorlevel 1 (
     exit /b 1
 )
 popd
+:frontend_deps_ready
+echo Frontend dependencies are ready. Run npm install manually after changing its package files.
 
 REM 3) Start supporting services and wait until they are ready.
 echo Starting Ordely infrastructure...
@@ -70,11 +76,35 @@ if errorlevel 1 (
 )
 popd
 
-REM Run the app processes on Windows.
-start "Ordely Backend" /D "%~dp0backend" cmd /k "npm run start:dev"
-start "Ordely Frontend" /D "%~dp0frontend" cmd /k "npm run dev"
+REM 5) Seed demo merchants only when the database has no boutiques.
+echo Seeding demo merchants if the database is empty...
+pushd "%~dp0backend"
+call npm run db:seed:demo:if-empty
+if errorlevel 1 (
+    echo Demo data seeding failed. The app servers were not started.
+    popd
+    pause
+    exit /b 1
+)
+popd
 
-REM 5) Wait for the backend health endpoint
+REM 6) Run the app processes on Windows.
+curl -s -f -o NUL -m 2 http://localhost:3001/api/health
+if errorlevel 1 goto :start_backend
+echo Backend is already running; reusing it.
+goto :backend_started
+:start_backend
+start "Ordely Backend" /D "%~dp0backend" cmd /k "npm run start:dev"
+:backend_started
+curl -s -f -o NUL -m 2 http://localhost:3200
+if errorlevel 1 goto :start_frontend
+echo Frontend is already running; reusing it.
+goto :frontend_started
+:start_frontend
+start "Ordely Frontend" /D "%~dp0frontend" cmd /k "npm run dev"
+:frontend_started
+
+REM 7) Wait for the backend health endpoint
 echo Waiting for the backend on http://localhost:3001/api/health ...
 set /a tries=0
 :wait_backend

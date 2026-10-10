@@ -6,6 +6,11 @@ import { MailMessage, MailService } from './../src/mail/mail.service';
 import { PrismaService } from './../src/prisma/prisma.service';
 
 // Runs against the database in DATABASE_URL (e.g. `docker compose up -d db`).
+// Shared secret of the voice agent callbacks, as Ringio would send it.
+const VOICE_SECRET = 'e2e-voice-callback-secret';
+process.env.VOICE_CALLBACK_SECRET = VOICE_SECRET;
+// Plan payments in test mode, as in development.
+process.env.PAYMENTS_PROVIDER = 'simulated';
 describe('App (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -453,13 +458,12 @@ describe('App (e2e)', () => {
         .send({
           customer: 'E2E',
           phone: '+216 22 000 000',
-          item: 'Test item',
-          quantity: 2,
+          items: [{ productName: 'Test item', quantity: 2, unitPrice: 21.25 }],
           total: 42.5,
         })
         .expect(201);
       const id = created.body.id;
-      expect(created.body).toMatchObject({ status: 'pending', quantity: 2 });
+      expect(created.body).toMatchObject({ status: 'pending', total: '42.5' });
 
       await request(server).get(`/orders/${id}`).set(auth).expect(200);
 
@@ -499,12 +503,11 @@ describe('App (e2e)', () => {
       await request(server)
         .patch(`/orders/${id}`)
         .set(auth)
-        .send({ customer: '  Edited  ', quantity: 3, total: 60 })
+        .send({ customer: '  Edited  ', total: 60 })
         .expect(200)
         .expect((res) =>
           expect(res.body).toMatchObject({
             customer: 'Edited',
-            quantity: 3,
             total: '60',
             status: 'confirmed',
           }),
@@ -512,7 +515,7 @@ describe('App (e2e)', () => {
       await request(server)
         .patch(`/orders/${id}`)
         .set(auth)
-        .send({ quantity: 0 })
+        .send({ total: -1 })
         .expect(400);
       await request(server).delete(`/orders/${id}`).set(auth).expect(204);
       await request(server).get(`/orders/${id}`).set(auth).expect(404);
@@ -527,8 +530,7 @@ describe('App (e2e)', () => {
         .send({
           customer: 'Mine',
           phone: '+216 22 000 001',
-          item: 'Private item',
-          quantity: 1,
+          items: [{ productName: 'Private item', quantity: 1, unitPrice: 10 }],
           total: 10,
         })
         .expect(201);
@@ -625,7 +627,7 @@ describe('App (e2e)', () => {
       return request(app.getHttpServer())
         .post('/orders')
         .set('Authorization', `Bearer ${token}`)
-        .send({ customer: '', quantity: 0 })
+        .send({ customer: '', items: [] })
         .expect(400);
     });
   });
@@ -754,9 +756,14 @@ describe('App (e2e)', () => {
             boutiqueId: shopId,
             customer: CUSTOMER,
             phone: CUSTOMER_PHONE,
-            item: 'Robe',
-            quantity: 1,
             total: 100,
+            items: {
+              create: {
+                productName: 'Robe',
+                quantity: 1,
+                unitPrice: 100,
+              },
+            },
             calls: { create: { ...call, language: 'French' } },
           },
         });
@@ -888,6 +895,346 @@ describe('App (e2e)', () => {
         .get(`/admin/merchants/${me.boutiqueId}`)
         .set(admin)
         .expect(404);
+    });
+  });
+
+  describe('voice agent callbacks (/internal/voice)', () => {
+    const agent = { Authorization: `Bearer ${VOICE_SECRET}` };
+    // The smallest valid WAV: a 44-byte RIFF/WAVE header with no samples.
+    const wav = Buffer.alloc(44);
+    wav.write('RIFF', 0, 'ascii');
+    wav.write('WAVE', 8, 'ascii');
+    let orderId: number;
+
+    /** Queues a call for the order and marks it as handed to the agent, like the dispatcher. */
+    async function dispatchedCall() {
+      const res = await request(app.getHttpServer())
+        .post('/calls')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ orderId })
+        .expect(201);
+      await prisma.call.update({
+        where: { id: res.body.id },
+        data: { dispatchedAt: new Date() },
+      });
+      return res.body.id as number;
+    }
+
+    beforeAll(async () => {
+      const res = await request(app.getHttpServer())
+        .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          customer: 'Voice Customer',
+          phone: '+216 22 333 444',
+          items: [{ productName: 'Montre', quantity: 1, unitPrice: 120 }],
+        })
+        .expect(201);
+      orderId = res.body.id;
+    });
+
+    it('refuses callbacks without the secret, and for calls it never sent', async () => {
+      const server = app.getHttpServer();
+      const queued = await request(server)
+        .post('/calls')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ orderId })
+        .expect(201);
+      const body = { taskId: `call-${queued.body.id}`, phase: 'ringing' };
+      await request(server)
+        .post('/internal/voice/events')
+        .send(body)
+        .expect(401);
+      await request(server)
+        .post('/internal/voice/events')
+        .set('Authorization', 'Bearer wrong-secret-wrong-secret')
+        .send(body)
+        .expect(401);
+      // Queued in Ordely but never dispatched: not the agent's to touch.
+      await request(server)
+        .post('/internal/voice/events')
+        .set(agent)
+        .send(body)
+        .expect(404);
+      await request(server)
+        .post('/internal/voice/events')
+        .set(agent)
+        .send({ taskId: 'order-1', phase: 'ringing' })
+        .expect(400);
+      // Leave no queued call behind for the next tests.
+      await prisma.call.delete({ where: { id: queued.body.id } });
+    });
+
+    it('keeps an unclear conversation, recordings included, and leaves the order pending', async () => {
+      const server = app.getHttpServer();
+      const callId = await dispatchedCall();
+      const taskId = `call-${callId}`;
+      await request(server)
+        .post('/internal/voice/events')
+        .set(agent)
+        .send({ taskId, phase: 'live', providerCallId: 'ringio-123' })
+        .expect(200);
+      // Fragments may arrive out of order.
+      for (const [sequence, speaker, text] of [
+        [2, 'agent', ' Ines, tconfirmi?'],
+        [1, 'agent', 'Aslema'],
+        [3, 'customer', 'Chkoun'],
+        [4, 'customer', ' m3aya?'],
+      ] as const) {
+        await request(server)
+          .post('/internal/voice/transcript')
+          .set(agent)
+          .send({
+            taskId,
+            sequence,
+            speaker,
+            text,
+            timestamp: new Date().toISOString(),
+          })
+          .expect(200);
+      }
+      await request(server)
+        .post('/internal/voice/recordings')
+        .set(agent)
+        .field('taskId', taskId)
+        .field('speaker', 'customer')
+        .attach(
+          'file',
+          Buffer.from('not a wav file at all, just text......'),
+          'customer.wav',
+        )
+        .expect(400);
+      for (const speaker of ['customer', 'agent']) {
+        await request(server)
+          .post('/internal/voice/recordings')
+          .set(agent)
+          .field('taskId', taskId)
+          .field('speaker', speaker)
+          .field('durationMs', '0')
+          .attach('file', wav, `${speaker}.wav`)
+          .expect(200);
+      }
+      await request(server)
+        .post('/internal/voice/result')
+        .set(agent)
+        .send({
+          taskId,
+          disposition: 'completed',
+          intent: 'UNCLEAR',
+          confidence: 0.4,
+          durationSeconds: 25,
+        })
+        .expect(200)
+        .expect((res) =>
+          expect(res.body).toMatchObject({
+            outcome: 'unresolved',
+            applied: true,
+          }),
+        );
+
+      const call = await request(server)
+        .get(`/calls/${callId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(call.body).toMatchObject({
+        status: 'no_answer',
+        durationSeconds: 25,
+        providerCallId: 'ringio-123',
+        transcript: [
+          { speaker: 'agent', text: 'Aslema Ines, tconfirmi?' },
+          { speaker: 'customer', text: 'Chkoun m3aya?' },
+        ],
+      });
+      expect(call.body.recordings.customer).toContain(
+        `recordings/call-${callId}/customer.wav`,
+      );
+      expect(call.body).not.toHaveProperty('transcriptParts');
+      expect(call.body).not.toHaveProperty('recordingKeys');
+      await request(server)
+        .get(`/orders/${orderId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect((res) => expect(res.body.status).toBe('pending'));
+    });
+
+    it('confirms the order on a clear yes, once', async () => {
+      const server = app.getHttpServer();
+      const callId = await dispatchedCall();
+      const taskId = `call-${callId}`;
+      await request(server)
+        .post('/internal/voice/result')
+        .set(agent)
+        .send({
+          taskId,
+          disposition: 'completed',
+          intent: 'CONFIRMED',
+          confidence: 0.95,
+          language: 'TUNISIAN_ARABIC',
+          durationSeconds: 41,
+        })
+        .expect(200)
+        .expect((res) =>
+          expect(res.body).toMatchObject({
+            outcome: 'confirmed',
+            applied: true,
+          }),
+        );
+      await request(server)
+        .get(`/orders/${orderId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect((res) => expect(res.body.status).toBe('confirmed'));
+      const call = await prisma.call.findUniqueOrThrow({
+        where: { id: callId },
+      });
+      expect(call).toMatchObject({
+        status: 'confirmed',
+        language: 'Darija',
+        durationSeconds: 41,
+      });
+
+      // A late or repeated result changes nothing; the call is over for the transcript too.
+      await request(server)
+        .post('/internal/voice/result')
+        .set(agent)
+        .send({
+          taskId,
+          disposition: 'completed',
+          intent: 'CANCELLED',
+          confidence: 1,
+        })
+        .expect(200)
+        .expect((res) => expect(res.body.applied).toBe(false));
+      await request(server)
+        .post('/internal/voice/transcript')
+        .set(agent)
+        .send({ taskId, sequence: 9, speaker: 'agent', text: 'late' })
+        .expect(409);
+      await request(server)
+        .get(`/orders/${orderId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect((res) => expect(res.body.status).toBe('confirmed'));
+    });
+  });
+
+  describe('billing (plan and payment)', () => {
+    it('recommends a plan from the daily volume, and only a successful payment starts it', async () => {
+      const server = app.getHttpServer();
+      const auth = { Authorization: `Bearer ${token}` };
+      const me = await prisma.user.findUniqueOrThrow({ where: { email } });
+
+      await request(server)
+        .patch('/boutique/details')
+        .set(auth)
+        .send({ dailyOrderVolume: '50_100' })
+        .expect(200);
+      await request(server)
+        .get('/billing/plans')
+        .set(auth)
+        .expect(200)
+        .expect((res) =>
+          expect(res.body).toMatchObject({
+            recommended: 'growth',
+            current: 'free',
+            payments: { available: true, testMode: true },
+          }),
+        );
+
+      // No plan without a payment method, an unknown card or an unknown plan.
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'growth' })
+        .expect(400);
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'growth', paymentToken: 'tok_made_up' })
+        .expect(400);
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'platinum' })
+        .expect(400);
+      // A card number is not an accepted field: it must never reach the API.
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({
+          plan: 'growth',
+          paymentToken: 'tok_test_visa',
+          cardNumber: '4242424242424242',
+        })
+        .expect(400);
+
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'growth', paymentToken: 'tok_test_declined' })
+        .expect(402)
+        .expect((res) =>
+          expect(res.body.message).toBe('Your card was declined.'),
+        );
+
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'growth', paymentToken: 'tok_test_visa' })
+        .expect(200)
+        .expect((res) =>
+          expect(res.body).toMatchObject({
+            plan: 'growth',
+            payment: {
+              amount: 199,
+              currency: 'TND',
+              cardLast4: '4242',
+              testMode: true,
+            },
+          }),
+        );
+      await request(server)
+        .get('/calls/usage')
+        .set(auth)
+        .expect((res) =>
+          expect(res.body).toMatchObject({ plan: 'Growth plan', limit: 5000 }),
+        );
+      await request(server)
+        .get('/billing/plans')
+        .set(auth)
+        .expect((res) => expect(res.body.current).toBe('growth'));
+
+      const payments = await prisma.payment.findMany({
+        where: { boutiqueId: me.boutiqueId },
+        orderBy: { id: 'asc' },
+      });
+      expect(
+        payments.map((p) => [
+          p.status,
+          p.plan,
+          Number(p.amount),
+          p.failureReason,
+        ]),
+      ).toEqual([
+        ['failed', 'growth', 199, 'card_declined'],
+        ['succeeded', 'growth', 199, null],
+      ]);
+
+      // Back to free: the paid plan is cancelled.
+      await request(server)
+        .post('/billing/subscribe')
+        .set(auth)
+        .send({ plan: 'free' })
+        .expect(200);
+      await request(server)
+        .get('/calls/usage')
+        .set(auth)
+        .expect((res) => expect(res.body.limit).toBe(500));
+    });
+
+    it('requires a session', async () => {
+      await request(app.getHttpServer()).get('/billing/plans').expect(401);
+      await request(app.getHttpServer())
+        .post('/billing/subscribe')
+        .send({ plan: 'free' })
+        .expect(401);
     });
   });
 });

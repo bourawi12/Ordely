@@ -2,19 +2,18 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import Icon from "@/components/Icon";
-import type { CallWithOrder } from "@/lib/api";
+import type { CallDetail, CallWithOrder } from "@/lib/api";
 import { formatClock, formatDateTime, formatDuration, formatTND } from "@/lib/format";
 import {
   createTestOrderAndQueueAction,
   dispatchCallAction,
   getCallDetailsAction,
-  getRecordingUrlAction,
 } from "./actions";
 import styles from "./voice-lab.module.css";
 
 interface VoiceLabClientProps {
   initialCalls: CallWithOrder[];
-  initialSelectedCall: (CallWithOrder & { attempts: number }) | null;
+  initialSelectedCall: CallDetail | null;
 }
 
 export default function VoiceLabClient({
@@ -22,7 +21,7 @@ export default function VoiceLabClient({
   initialSelectedCall,
 }: VoiceLabClientProps) {
   const [calls, setCalls] = useState<CallWithOrder[]>(initialCalls);
-  const [selectedCall, setSelectedCall] = useState<(CallWithOrder & { attempts: number }) | null>(
+  const [selectedCall, setSelectedCall] = useState<CallDetail | null>(
     initialSelectedCall,
   );
   const [selectedId, setSelectedId] = useState<number | null>(
@@ -56,8 +55,9 @@ export default function VoiceLabClient({
     const res = await getCallDetailsAction(callId);
     if (res.success && res.call) {
       setSelectedCall(res.call);
+      const callSummary = { ...res.call, recordings: undefined };
       setCalls((prev) =>
-        prev.map((c) => (c.id === callId ? { ...c, ...res.call } : c)),
+        prev.map((c) => (c.id === callId ? { ...c, ...callSummary } : c)),
       );
     }
   }, []);
@@ -79,26 +79,8 @@ export default function VoiceLabClient({
     const fetchRecordings = async () => {
       setLoadingAudio(true);
       try {
-        const hasAgent = selectedCall.recordings?.some((r) => r.speaker === "agent");
-        const hasCustomer = selectedCall.recordings?.some((r) => r.speaker === "customer");
-
-        if (hasAgent) {
-          const agentRes = await getRecordingUrlAction(selectedCall.id, "agent");
-          if (agentRes.success && agentRes.url) {
-            setAgentAudioUrl(agentRes.url);
-          }
-        } else {
-          setAgentAudioUrl(null);
-        }
-
-        if (hasCustomer) {
-          const custRes = await getRecordingUrlAction(selectedCall.id, "customer");
-          if (custRes.success && custRes.url) {
-            setCustomerAudioUrl(custRes.url);
-          }
-        } else {
-          setCustomerAudioUrl(null);
-        }
+        setAgentAudioUrl(selectedCall.recordings?.agent ?? null);
+        setCustomerAudioUrl(selectedCall.recordings?.customer ?? null);
       } finally {
         setLoadingAudio(false);
       }

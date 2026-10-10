@@ -20,6 +20,7 @@ export interface CallStatusChangedEvent {
   callId: number;
   orderId: number;
   status: string;
+  transportPhase?: string | null;
   updatedAt: string;
 }
 
@@ -158,8 +159,10 @@ export default function RealtimeProvider({
               const id = String(Date.now() + Math.random());
               addNotification({
                 id,
-                title: "Call Status Updated",
-                message: `Call for Order #${payload.orderId} is now ${payload.status}`,
+                title: payload.transportPhase ? "Call Progress Updated" : "Call Status Updated",
+                message: payload.transportPhase
+                  ? `Call for Order #${payload.orderId} is ${payload.transportPhase}`
+                  : `Call for Order #${payload.orderId} is now ${payload.status}`,
                 timestamp: new Date().toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",

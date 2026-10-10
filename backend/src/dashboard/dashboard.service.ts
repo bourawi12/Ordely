@@ -31,12 +31,15 @@ export class DashboardService {
     const [
       totalOrders,
       confirmedOrders,
+      cancelledOrders,
       failedCalls,
       avgDuration,
       week,
       recentCalls,
       pendingOrders,
       pendingCount,
+      retryableCount,
+      reviewCount,
     ] = await Promise.all([
       this.metric(
         (createdAt) =>
@@ -48,6 +51,14 @@ export class DashboardService {
         (createdAt) =>
           this.prisma.order.count({
             where: { boutiqueId, createdAt, status: 'confirmed' },
+          }),
+        current,
+        previous,
+      ),
+      this.metric(
+        (createdAt) =>
+          this.prisma.order.count({
+            where: { boutiqueId, createdAt, status: 'cancelled' },
           }),
         current,
         previous,
@@ -96,10 +107,31 @@ export class DashboardService {
         },
       }),
       this.prisma.order.count({ where: { boutiqueId, status: 'pending' } }),
+      this.prisma.call.count({
+        where: {
+          status: { in: ['failed', 'no_answer'] },
+          order: {
+            boutiqueId,
+            status: { in: ['pending', 'unreachable'] },
+          },
+        },
+      }),
+      this.prisma.call.count({
+        where: {
+          disposition: 'needs_human',
+          order: { boutiqueId, status: 'unreachable' },
+        },
+      }),
     ]);
 
     return {
-      stats: { totalOrders, confirmedOrders, failedCalls, avgDuration },
+      stats: {
+        totalOrders,
+        confirmedOrders,
+        cancelledOrders,
+        failedCalls,
+        avgDuration,
+      },
       week,
       recentCalls,
       pendingOrders: pendingOrders.map(({ calls, ...order }) => ({
@@ -107,6 +139,10 @@ export class DashboardService {
         callQueued: calls.length > 0,
       })),
       pendingCount,
+      actionCounts: {
+        retryable: retryableCount,
+        needsReview: reviewCount,
+      },
     };
   }
 

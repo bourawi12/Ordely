@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { CurrentBoutique } from '../auth/current-user.decorator';
 import { CallArtifactService } from '../voice/artifacts/call-artifact.service';
-import { CallDispatcherService } from '../voice/call-dispatcher.service';
+import { CallDispatcherService } from './orchestration/call-dispatcher.service';
 import { CallsService } from './calls.service';
 import { CallFiltersDto, ListCallsDto } from './dto/list-calls.dto';
 import { QueueCallDto } from './dto/queue-call.dto';
@@ -64,6 +64,11 @@ export class CallsController {
   @Post()
   queue(@CurrentBoutique() boutiqueId: number, @Body() dto: QueueCallDto) {
     return this.callsService.queue(boutiqueId, dto.orderId);
+  }
+
+  @Post('retry')
+  retry(@CurrentBoutique() boutiqueId: number, @Body() dto: QueueCallDto) {
+    return this.callsService.retryAfterReview(boutiqueId, dto.orderId);
   }
 
   @Post('queue-pending')

@@ -1,5 +1,7 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Public } from '../../auth/public.decorator';
+import { CallOrchestratorService } from '../../calls/orchestration/call-orchestrator.service';
 import { VoiceCallEvent, VoiceCallResult } from '../voice.types';
 import { CallCallbackGuard } from './call-callback.guard';
 import { CallCallbackService } from './call-callback.service';
@@ -8,7 +10,10 @@ import { CallCallbackService } from './call-callback.service';
 @Public()
 @UseGuards(CallCallbackGuard)
 export class CallCallbackController {
-  constructor(private readonly callbackService: CallCallbackService) {}
+  constructor(
+    private readonly callbackService: CallCallbackService,
+    private readonly moduleRef: ModuleRef,
+  ) {}
 
   @Post('events')
   async handleEvent(@Body() event: VoiceCallEvent) {
@@ -17,6 +22,10 @@ export class CallCallbackController {
 
   @Post('result')
   async handleResult(@Body() result: VoiceCallResult) {
-    return this.callbackService.handleResult(result);
+    const response = await this.callbackService.handleResult(result);
+    void this.moduleRef
+      .get(CallOrchestratorService, { strict: false })
+      ?.pollOnce();
+    return response;
   }
 }

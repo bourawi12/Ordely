@@ -8,7 +8,8 @@ The system should behave like this:
 
 - the customer-facing voice flow asks the customer to confirm the order
 - the session runtime keeps the live call alive and tracks transcript and status
-- a decision layer interprets the outcome of the call against the order
+- Maria reports the customer's decision in a structured result
+- backend policy validates the result and controls retries
 - a final backend service writes the final order state only when the decision is valid
 
 The architecture is intentionally layered so that the customer conversation, telephony lifecycle, and business mutation do not become the same responsibility.
@@ -26,8 +27,10 @@ Maria should:
 - greet the customer
 - read the order details
 - ask for explicit confirmation
-- handle yes/no and clarification flows
-- detect whether the customer clearly confirmed, declined, stalled, or became unreachable
+- ask one or two concise, non-repetitive clarifying questions when needed
+- decide whether the customer clearly confirmed, declined, stalled, or became unreachable
+- tell the customer whether the order is confirmed or cancelled
+- give a brief goodbye before reporting the structured outcome
 - confirm the address
 - emit a structured outcome for the rest of the system
 
@@ -58,22 +61,13 @@ This layer is responsible for:
 - collecting transcript and artifacts
 - detecting a finished or failed call
 - closing the call cleanly
-- sending a structured result to the decision layer
+- forwarding Maria's structured result to the backend callback
 
 This layer should not directly modify the order status. It reports the outcome of the call.
 
-### 4. Nora: decision and policy agent
+### 4. Backend decision policy
 
-Nora interprets the result of the conversation using the actual order, transcript, and policy rules. She decides whether the correct outcome is:
-
-- confirmed
-- declined
-- rejected
-- retry later
-- manual review required
-- no answer / failed
-
-Nora does the business interpretation. She validates the signal against the real order context before anything is written.
+The backend consumes Maria's structured intent, confidence, and language. It requires confidence of at least 0.7 and a still-pending order before confirming or cancelling. Unclear or below-threshold results are retried under the existing three-attempt schedule; only a still-unresolved third attempt is routed for human review.
 
 ### 5. Final order write service
 
@@ -81,7 +75,7 @@ The final write service is the backend boundary that applies a valid order decis
 
 It should:
 
-- accept the validated decision from Nora
+- accept the validated decision from backend policy
 - verify the order still matches the expected state
 - update the order status
 - write an audit log or notes
@@ -99,8 +93,8 @@ The system should be organized in a clear sequence:
 2. The call orchestration layer decides to launch a confirmation call.
 3. The runtime session layer creates and runs the live call.
 4. Maria speaks to the customer and collects a conversational outcome.
-5. The runtime session layer sends the transcript and result to the decision layer.
-6. Nora evaluates the result against the order and policy.
+5. The runtime session layer forwards the transcript and Maria's structured result to the backend callback.
+6. Backend policy checks Maria's result against the confidence threshold and current order state.
 7. The final order write service mutates the order only when the decision is valid.
 
 This keeps the application safe and understandable.
@@ -116,7 +110,7 @@ The same applies if the runtime layer directly changes the order. Telephony stat
 The separation ensures:
 
 - telephony failures stay in the runtime layer
-- business decisions stay in the decision layer
+- Maria reports customer intent; backend policy validates which action is allowed
 - actual order mutations happen only through a controlled backend service
 
 ---

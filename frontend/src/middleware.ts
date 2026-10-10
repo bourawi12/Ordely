@@ -19,6 +19,7 @@ export const config = {
     "/dashboard/:path*",
     "/call-logs/:path*",
     "/orders/:path*",
+    "/reclamations/:path*",
     "/analytics/:path*",
     "/integrations/:path*",
     "/settings/:path*",

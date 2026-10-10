@@ -7,19 +7,19 @@ import { CallArtifactService } from './artifacts/call-artifact.service';
 import { CallCallbackController } from './callbacks/call-callback.controller';
 import { CallCallbackGuard } from './callbacks/call-callback.guard';
 import { CallCallbackService } from './callbacks/call-callback.service';
-import { CallDispatcherService } from './call-dispatcher.service';
 import { VOICE_AGENT_CLIENT } from './voice-agent-client.interface';
 import { VoiceController } from './voice.controller';
+import { RealtimeModule } from '../realtime/realtime.module';
+import { IntegrationWebhookModule } from '../integrations/integration-webhook.module';
 
 @Module({
-  imports: [PrismaModule, StorageModule],
+  imports: [PrismaModule, StorageModule, RealtimeModule, IntegrationWebhookModule],
   controllers: [
     CallCallbackController,
     CallArtifactController,
     VoiceController,
   ],
   providers: [
-    CallDispatcherService,
     CallCallbackService,
     CallArtifactService,
     CallCallbackGuard,
@@ -28,6 +28,6 @@ import { VoiceController } from './voice.controller';
       useClass: RingioAdapter,
     },
   ],
-  exports: [CallDispatcherService, CallArtifactService, VOICE_AGENT_CLIENT],
+  exports: [CallArtifactService, VOICE_AGENT_CLIENT],
 })
 export class VoiceModule {}

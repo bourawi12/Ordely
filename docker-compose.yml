@@ -83,6 +83,16 @@ services:
       # Back office unit economics: estimated telephony + AI cost, in TND.
       COST_PER_MINUTE: ${COST_PER_MINUTE:-0.35}
       COST_PER_CALL: ${COST_PER_CALL:-0.02}
+      # AI voice agent (Ringio): see README "Voice agent".
+      VOICE_DISPATCH_ENABLED: ${VOICE_DISPATCH_ENABLED:-false}
+      VOICE_AGENT_URL: ${VOICE_AGENT_URL:-http://host.docker.internal:4200}
+      VOICE_AGENT_TOKEN: ${VOICE_AGENT_TOKEN:-}
+      VOICE_CALLBACK_SECRET: ${VOICE_CALLBACK_SECRET:-}
+      VOICE_TEST_DESTINATION: ${VOICE_TEST_DESTINATION:-}
+      VOICE_MIN_CONFIDENCE: ${VOICE_MIN_CONFIDENCE:-0.8}
+      VOICE_CALL_TIMEOUT_MINUTES: ${VOICE_CALL_TIMEOUT_MINUTES:-10}
+      # Plan payments. Empty: paid plans can't be bought. "simulated" is test mode (dev only).
+      PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     depends_on:

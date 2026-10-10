@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import Icon from "@/components/Icon";
-import { queueAllPending, queueCall, type QueueState } from "@/app/(app)/call-logs/actions";
+import { queueAllPending, queueCall, retryCall, type QueueState } from "@/app/(app)/call-logs/actions";
 import styles from "./ui.module.css";
 
 export function CallNowButton({ orderId, queued }: { orderId: number; queued: boolean }) {
@@ -40,6 +40,28 @@ export function CallAllPendingButton({ disabled }: { disabled?: boolean }) {
         <Icon name="phoneCall" size={18} />
         {pending ? "Queuing…" : "Call all pending"}
       </button>
+    </form>
+  );
+}
+
+export function RetryCallButton({ orderId }: { orderId: number }) {
+  const [state, action, pending] = useActionState<QueueState>(
+    () => retryCall(orderId),
+    {},
+  );
+  const queued = Boolean(state.message);
+
+  return (
+    <form action={action}>
+      <button
+        type="submit"
+        className={styles.btnSoft}
+        disabled={pending || queued}
+        title={state.error}
+      >
+        {queued ? "Retry queued" : pending ? "Queuing…" : "Try again"}
+      </button>
+      {state.error && <span className={styles.error}>{state.error}</span>}
     </form>
   );
 }

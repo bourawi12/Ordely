@@ -1,8 +1,8 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
+import { CallDispatcherService } from '../calls/orchestration/call-dispatcher.service';
 import { FakeVoiceAgentClient } from './adapters/fake-voice-agent-client';
-import { CallDispatcherService } from './call-dispatcher.service';
 
 describe('CallDispatcherService', () => {
   let service: CallDispatcherService;
@@ -30,11 +30,14 @@ describe('CallDispatcherService', () => {
       boutique: {
         id: 1,
         callLanguages: ['ar-TN', 'fr'],
+        callStartTime: '00:00',
+        callEndTime: '23:59',
       },
     },
   };
 
   beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-07T10:00:00.000Z'));
     fakeClient = new FakeVoiceAgentClient();
     prismaMock = {
       call: {
@@ -46,6 +49,10 @@ describe('CallDispatcherService', () => {
       prismaMock as unknown as PrismaService,
       fakeClient,
     );
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('dispatches a pending call and marks it as dispatched', async () => {
@@ -116,5 +123,43 @@ describe('CallDispatcherService', () => {
     await expect(service.dispatchCall(1, 101)).rejects.toThrow(
       ConflictException,
     );
+  });
+
+  it('defers dispatch outside the boutique call window', async () => {
+    prismaMock.call.findFirst.mockResolvedValue({
+      ...sampleCall,
+      order: {
+        ...sampleCall.order,
+        boutique: {
+          ...sampleCall.order.boutique,
+          callStartTime: '09:00',
+          callEndTime: '17:00',
+        },
+      },
+    });
+    jest.setSystemTime(new Date('2026-10-07T17:00:00.000Z'));
+
+    const result = await service.dispatchCall(1, 101);
+
+    expect(result).toMatchObject({
+      deferred: true,
+      deferredReason: 'outside_call_window',
+    });
+    expect(fakeClient.dispatched).toHaveLength(0);
+    expect(prismaMock.call.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps an attempt pending when Ringio capacity disappears before launch', async () => {
+    prismaMock.call.findFirst.mockResolvedValue(sampleCall);
+    fakeClient.capacityAvailable = false;
+
+    const result = await service.dispatchCall(1, 101);
+
+    expect(result).toMatchObject({
+      deferred: true,
+      deferredReason: 'capacity_unavailable',
+    });
+    expect(fakeClient.dispatched).toHaveLength(0);
+    expect(prismaMock.call.update).not.toHaveBeenCalled();
   });
 });

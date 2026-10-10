@@ -13,8 +13,8 @@ This document describes the end-to-end flow from a pending order to an order dec
 3. The runtime session layer starts the live call and manages the connection.
 4. Maria speaks to the customer and collects the response.
 5. The runtime layer records the transcript and final call outcome.
-6. Nora evaluates the transcript, order, and policy.
-7. Nora produces a validated decision.
+6. Maria reports structured intent, confidence, and language after telling the customer the outcome and saying goodbye.
+7. Backend policy checks confidence and verifies that the order is still pending.
 8. The final order write service applies the decision to the order.
 9. The system records the result and creates the next action if needed.
 
@@ -57,47 +57,46 @@ She may:
 
 - confirm the item
 - confirm quantity and amount
-- ask whether the customer wants a different delivery time
+- ask one or two concise clarifying questions when needed, without repeating herself
 - detect a clear yes or no
 - recognize ambiguity
 
 ### Step 5: conversation reaches a terminal state
 
-Maria decides the customer interaction has reached a final outcome, such as:
+Maria decides the customer interaction has reached a final outcome, tells the customer whether the order is confirmed or cancelled, and says goodbye. She then reports one of:
 
 - confirmed
 - declined
 - no answer
 - ambiguous
-- needs human review
+- unclear after up to two clarifying questions
 
 This outcome is communicated in a structured form, not as a direct database update.
 
 ### Step 6: runtime sends the result
 
-The runtime sends the final transcript and the call disposition to the decision layer.
+The runtime waits for Maria's final spoken audio to drain, ends the provider call, and sends the transcript and structured result to the backend callback.
 
 It reports the conversation result without changing the order itself.
 
-### Step 7: Nora evaluates the outcome
+### Step 7: Backend validates the outcome
 
-Nora checks the stated outcome against the actual order and policy.
+Backend policy checks Maria's stated outcome against the 0.7 confidence threshold and actual order state.
 
-She looks at:
+Backend policy checks:
 
-- whether the customer explicitly confirmed or declined
-- whether the transcript and order match
-- whether the confidence is high enough
-- whether business rules allow an automatic change
+- whether Maria reported an explicit confirmation or cancellation
+- whether confidence is at least 0.7
+- whether the order remains pending
 
-### Step 8: Nora returns the validated decision
+### Step 8: Backend derives the next action
 
-Nora returns a single outcome such as:
+Backend policy derives a next action such as:
 
 - confirmed
 - cancelled
 - retry_later
-- human_review_required
+- human_review_required only after the third unresolved attempt
 - policy_blocked
 
 ### Step 9: write the final order state
@@ -123,7 +122,7 @@ Depending on the decision, the system may:
 - Call orchestration starts the call and decides whether a call should happen.
 - Runtime session owns the live call and end-of-call lifecycle.
 - Maria handles the conversation and customer-facing flow.
-- Nora interprets the outcome and decides the business result.
+- Maria decides customer intent; backend policy validates eligibility and determines retries or final review.
 - Final order write service performs the actual database mutation.
 
 ---
@@ -146,28 +145,27 @@ A simple successful path is:
 - Maria asks for confirmation
 - customer says "yes, I confirm the order"
 - runtime records the transcript
-- Nora validates the transcript against the order
-- Nora returns `confirmed`
+- Maria says the order is confirmed, says goodbye, and reports `CONFIRMED`
+- backend policy validates confidence and the pending order state
 - final write service marks the order as `confirmed`
 
 A failure path is:
 
 - order is pending
 - call is dispatched
-- customer does not answer
-- runtime marks `no_answer`
-- Nora decides `retry_later`
-- final write service keeps the order pending and schedules another attempt
+- Maria remains uncertain after two clarifying questions
+- Maria tells the customer Ordely will follow up and reports `UNCLEAR`
+- backend keeps the order pending and schedules another attempt
 
 A review path is:
 
 - call ends
 - customer says something unclear or contradictory
-- Nora returns `human_review_required`
-- final write service leaves the order pending and exposes it to a human queue
+- Maria remains unclear through attempt three; backend marks the final call for review and moves the order to `unreachable`
+- the call log shows `needs_human` and the reason for staff follow-up
 
 ---
 
 ## Summary
 
-The decision flow exists to convert a finished conversation into a safe business action. The conversation agent speaks, the runtime owns the call, the decision layer interprets the meaning, and the final order service writes the result.
+The decision flow converts Maria's structured report into a safe business action. Maria speaks and decides intent, the runtime owns telephony, and backend policy validates and persists the result; unresolved outcomes are retried before human review.

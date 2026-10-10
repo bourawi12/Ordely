@@ -11,6 +11,7 @@ const TABS = [
   { href: "/admin/revenue", label: "Revenue" },
   { href: "/admin/merchants", label: "Merchants" },
   { href: "/admin/cohorts", label: "Cohorts" },
+  { href: "/admin/reclamations", label: "Reclamations" },
 ];
 
 /** Section tabs. The selected period follows from one section to the next. */

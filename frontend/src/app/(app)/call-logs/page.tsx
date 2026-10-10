@@ -2,7 +2,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import StatusBadge from "@/components/StatusBadge";
 import ui from "@/components/app/ui.module.css";
-import { api, ApiError, type CallWithOrder } from "@/lib/api";
+import { api, ApiError, type CallDetail as CallDetailData } from "@/lib/api";
 import { formatClock, formatDateTime, formatDuration, formatTND } from "@/lib/format";
 import CallDetail from "./CallDetail";
 import { callLogsHref, parseParams, RANGES, STATUS_TABS } from "./params";
@@ -31,7 +31,7 @@ export default async function CallLogsPage({
   });
 
   const selectedId = params.call ?? data.items[0]?.id;
-  let selected: (CallWithOrder & { attempts: number }) | null = null;
+  let selected: CallDetailData | null = null;
   if (selectedId) {
     selected = await api.getCall(selectedId).catch((err) => {
       if (err instanceof ApiError && err.status === 404) return null;
@@ -46,9 +46,40 @@ export default async function CallLogsPage({
     "/call-logs/export",
   );
   const showDate = params.range !== "today";
+  const completedCount = data.total - data.counts.pending;
+  const reviewCount = data.items.filter((call) => call.disposition === "needs_human").length;
+  const durationTotal = data.items.reduce((sum, call) => sum + (call.durationSeconds ?? 0), 0);
+  const durationCount = data.items.filter((call) => call.durationSeconds != null).length;
 
   return (
     <>
+      <div className={styles.pageHead}>
+        <div>
+          <p className={styles.eyebrow}>Voice activity</p>
+          <h1 className={styles.pageTitle}>Call logs</h1>
+        </div>
+        <p className={styles.pageContext}>{rangeLabel}</p>
+      </div>
+      <div className={styles.summaryGrid} aria-label="Call summary">
+        <div className={styles.summaryItem}>
+          <span className={styles.summaryLabel}>Calls in range</span>
+          <strong className={styles.summaryValue}>{data.total}</strong>
+        </div>
+        <div className={styles.summaryItem}>
+          <span className={styles.summaryLabel}>Completed</span>
+          <strong className={styles.summaryValue}>{completedCount}</strong>
+        </div>
+        <div className={styles.summaryItem}>
+          <span className={styles.summaryLabel}>Needs review</span>
+          <strong className={styles.summaryValue}>{reviewCount}</strong>
+        </div>
+        <div className={styles.summaryItem}>
+          <span className={styles.summaryLabel}>Average duration</span>
+          <strong className={styles.summaryValue}>
+            {durationCount ? formatDuration(Math.round(durationTotal / durationCount)) : "—"}
+          </strong>
+        </div>
+      </div>
       <div className={styles.toolbar}>
         <nav className={styles.tabs} aria-label="Filter by status">
           {STATUS_TABS.map((tab) => {
@@ -112,6 +143,7 @@ export default async function CallLogsPage({
                     <th>Order</th>
                     <th>Customer</th>
                     <th className={styles.wideOnly}>Phone</th>
+                    <th>Attempt</th>
                     <th>Time</th>
                     <th>Status</th>
                     <th>Duration</th>
@@ -141,8 +173,14 @@ export default async function CallLogsPage({
                           </span>
                         </td>
                         <td className={`${ui.muted} ${styles.wideOnly}`}>{call.order.phone || "—"}</td>
+                        <td className={ui.muted}>{call.attempt} / 3</td>
                         <td className={ui.muted}>
-                          {showDate ? formatDateTime(call.createdAt) : formatClock(call.createdAt)}
+                          <span>{showDate ? formatDateTime(call.createdAt) : formatClock(call.createdAt)}</span>
+                          {call.dispatchedAt && (
+                            <span className={styles.cellMeta}>
+                              Started {showDate ? formatDateTime(call.dispatchedAt) : formatClock(call.dispatchedAt)}
+                            </span>
+                          )}
                         </td>
                         <td>
                           <StatusBadge status={call.status} />

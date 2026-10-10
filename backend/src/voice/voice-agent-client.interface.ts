@@ -2,6 +2,7 @@ import { VoiceCallTask } from './voice.types';
 
 export interface StartTaskResult {
   accepted: boolean;
+  deferred?: boolean;
   error?: string;
 }
 
@@ -10,6 +11,9 @@ export interface StartTaskResult {
  * Ordely core services depend strictly on this abstraction (DIP).
  */
 export interface VoiceAgentClient {
+  /** Returns true only when a mobile app can accept a call immediately. */
+  checkCapacity(): Promise<boolean>;
+
   /**
    * Dispatches a call task to the agent runtime asynchronously.
    * Returns acceptance confirmation (HTTP 202-like), not blocking for call duration.

@@ -1,5 +1,8 @@
 const { AudioMediaBridge } = require('./audioMediaBridge');
 
+const DEFAULT_MAX_CALL_DURATION_MS = 4 * 60 * 1000;
+const DEFAULT_CUSTOMER_SILENCE_TIMEOUT_MS = 12 * 1000;
+
 class VoiceCallAgent {
   constructor({
     serverUrl,
@@ -16,6 +19,10 @@ class VoiceCallAgent {
     onStatus = () => {},
     taskId = null,
     ordelyClient = null,
+    maxCallDurationMs = DEFAULT_MAX_CALL_DURATION_MS,
+    customerSilenceTimeoutMs = DEFAULT_CUSTOMER_SILENCE_TIMEOUT_MS,
+    scheduleTimer = setTimeout,
+    cancelTimer = clearTimeout,
   }) {
     if (!serverUrl || !destinationNumber || !ioClient || !wrtc || !geminiFactory || !artifactStore || !artifactClient) {
       throw new Error('VoiceCallAgent requires server, destination, Socket.IO, WebRTC, Gemini, and storage dependencies.');
@@ -43,6 +50,12 @@ class VoiceCallAgent {
     };
     this.taskId = taskId;
     this.ordelyClient = ordelyClient;
+    this.maxCallDurationMs = maxCallDurationMs;
+    this.customerSilenceTimeoutMs = customerSilenceTimeoutMs;
+    this.scheduleTimer = scheduleTimer;
+    this.cancelTimer = cancelTimer;
+    this.decision = null;
+    this.endCallRequested = false;
     this.transcriptSequence = 0;
     this.startTime = null;
     this.socket = null;
@@ -60,6 +73,8 @@ class VoiceCallAgent {
     this.connectedOnce = false;
     this.transcriptWrites = Promise.resolve();
     this.finishTask = null;
+    this.callDurationTimer = null;
+    this.customerSilenceTimer = null;
     this.finishPromise = new Promise((resolve) => { this.resolveFinish = resolve; });
   }
 
@@ -166,6 +181,7 @@ class VoiceCallAgent {
     this.peer.onconnectionstatechange = () => {
       if (this.peer?.connectionState === 'connected') {
         this.startTime = Date.now();
+        this.startCallDurationTimer();
         this.socket.emit('call:active', { callId: this.callId });
         this.onStatus('starting_gemini');
         this.startGemini().catch((error) => this.fail(error));
@@ -231,6 +247,7 @@ class VoiceCallAgent {
       this.bridge.enqueueGeminiAudio(event.audio, sampleRate);
     } else if (event.type === 'transcript') {
       this.transcriptWrites = this.transcriptWrites.then(() => this.artifactClient.appendTranscript(this.callId, event));
+      if (event.speaker === 'mobile') this.resetCustomerSilenceTimer();
       if (this.ordelyClient && this.taskId && event.text) {
         this.transcriptSequence++;
         this.ordelyClient.sendTranscript({
@@ -252,10 +269,45 @@ class VoiceCallAgent {
         this.onStatus('live');
         this.logger.info('Introduction played. Mobile speech forwarding to Gemini is enabled.');
       }
+      this.resetCustomerSilenceTimer();
+      if (this.decision && this.endCallRequested && !this.closing) await this.stop();
+    } else if (event.type === 'decision') {
+      this.recordDecision(event);
+    } else if (event.type === 'end-call') {
+      this.endCallRequested = true;
+      try {
+        this.gemini?.acknowledgeTool?.(event.id, event.name);
+      } catch (error) {
+        this.logger.warn(`Could not acknowledge Maria's end-call signal: ${error.message}`);
+      }
     } else if (event.type === 'session-expiring') {
       this.logger.warn(`Gemini Live session is expiring in ${event.timeLeft || 'an unknown interval'}.`);
     } else if (event.type === 'error' || event.type === 'closed') {
       this.fail(event.error || new Error('Gemini Live session closed.'));
+    }
+  }
+
+  recordDecision({ id, name, args = {} }) {
+    const intents = ['CONFIRMED', 'CANCELLED', 'UNCLEAR'];
+    const languages = ['FRENCH', 'ENGLISH', 'TUNISIAN_ARABIC', 'MIXED'];
+    if (!this.decision) {
+      this.decision = {
+        intent: intents.includes(args.intent) ? args.intent : 'UNCLEAR',
+        confidence:
+          typeof args.confidence === 'number' &&
+          Number.isFinite(args.confidence) &&
+          args.confidence >= 0 &&
+          args.confidence <= 1
+            ? args.confidence
+            : 0,
+        language: languages.includes(args.language) ? args.language : 'TUNISIAN_ARABIC',
+      };
+      this.clearCustomerSilenceTimer();
+    }
+    try {
+      this.gemini?.acknowledgeTool?.(id, name);
+    } catch (error) {
+      this.logger.warn(`Could not acknowledge Maria's decision: ${error.message}`);
     }
   }
 
@@ -275,6 +327,7 @@ class VoiceCallAgent {
   finish(message, phase = 'ended') {
     if (this.finishTask) return this.finishTask;
     if (this.finished) return Promise.resolve();
+    this.clearTimers();
     this.closing = true;
     this.finishPhase = phase;
     this.onStatus(phase === 'error' || phase === 'rejected' ? phase : 'ending');
@@ -283,6 +336,7 @@ class VoiceCallAgent {
   }
 
   async cleanup(message) {
+    this.clearTimers();
     this.removeGeminiListener?.();
     this.gemini?.close();
     if (this.peer) this.peer.close();
@@ -315,7 +369,7 @@ class VoiceCallAgent {
           ? 'no_answer'
           : this.finishPhase === 'error'
             ? 'error'
-            : 'needs_human';
+            : 'completed';
       const durationSeconds = this.startTime
         ? Math.round((Date.now() - this.startTime) / 1000)
         : 0;
@@ -324,6 +378,7 @@ class VoiceCallAgent {
         providerCallId: this.callId,
         disposition,
         durationSeconds,
+        ...(this.decision || {}),
       }).catch((err) => this.logger.error('Ordely result callback error:', err.message));
     }
     this.finished = true;
@@ -343,6 +398,55 @@ class VoiceCallAgent {
     }
     return this.finish('Agent stopped.', 'ended');
   }
+
+  startCallDurationTimer() {
+    if (this.callDurationTimer || this.closing || this.finished) return;
+    this.callDurationTimer = this.scheduleTimer(() => {
+      this.callDurationTimer = null;
+      this.forceUnclear('Maximum call duration reached.').catch((error) => this.fail(error));
+    }, this.maxCallDurationMs);
+  }
+
+  resetCustomerSilenceTimer() {
+    this.clearCustomerSilenceTimer();
+    if (this.closing || this.finished || !this.greetingComplete || this.decision) return;
+    this.customerSilenceTimer = this.scheduleTimer(() => {
+      this.customerSilenceTimer = null;
+      if (this.closing || this.finished || this.decision || !this.gemini) return;
+      try {
+        this.gemini.speak('اسأل الحريف بلطف: ألو، تسمع فيّا؟');
+      } catch (error) {
+        this.fail(error);
+        return;
+      }
+      this.resetCustomerSilenceTimer();
+    }, this.customerSilenceTimeoutMs);
+  }
+
+  clearCustomerSilenceTimer() {
+    if (!this.customerSilenceTimer) return;
+    this.cancelTimer(this.customerSilenceTimer);
+    this.customerSilenceTimer = null;
+  }
+
+  clearTimers() {
+    if (this.callDurationTimer) this.cancelTimer(this.callDurationTimer);
+    this.callDurationTimer = null;
+    this.clearCustomerSilenceTimer();
+  }
+
+  async forceUnclear(reason) {
+    if (this.closing || this.finished || this.decision) return;
+    this.decision = { intent: 'UNCLEAR', confidence: 0, language: 'TUNISIAN_ARABIC' };
+    this.endCallRequested = true;
+    this.logger.warn(reason);
+    if (this.callId && this.socket?.connected) this.socket.emit('call:end', { callId: this.callId });
+    await this.finish(reason, 'timeout');
+  }
 }
 
-module.exports = { VoiceCallAgent };
+module.exports = {
+  DEFAULT_CUSTOMER_SILENCE_TIMEOUT_MS,
+  DEFAULT_MAX_CALL_DURATION_MS,
+  VoiceCallAgent,
+};

@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { getSessionToken } from "./session";
 import type { ThemeMode } from "./theme";
 
-export type OrderStatus = "pending" | "confirmed" | "cancelled";
+export type OrderStatus = "pending" | "confirmed" | "cancelled" | "unreachable";
 export type CallStatus = "pending" | "confirmed" | "failed" | "no_answer";
 export type CallRange = "today" | "7d" | "30d" | "all";
+export type ReclamationStatus = "open" | "in_progress" | "resolved";
 
 export interface OrderItem {
   id: number;
@@ -24,6 +25,22 @@ export interface Order {
   status: OrderStatus;
   createdAt: string;
   items?: OrderItem[];
+  callCount?: number;
+  nextCallAt?: string | null;
+}
+
+export interface Reclamation {
+  id: number;
+  subject: string;
+  description: string;
+  status: ReclamationStatus;
+  orderId: number | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: { id: number; name: string; email: string };
+  order: { id: number; customer: string; total: string } | null;
+  boutique?: { id: number; name: string | null };
 }
 
 export interface TranscriptLine {
@@ -73,6 +90,12 @@ export interface Call {
   transcriptEntries?: CallTranscriptEntry[];
 }
 
+/** One call with its order and, for voice agent calls, signed links to each speaker's audio. */
+export type CallDetail = Omit<CallWithOrder, "recordings"> & {
+  attempts: number;
+  recordings?: { agent: string | null; customer: string | null };
+};
+
 export type CallWithOrder = Call & {
   order: Pick<Order, "id" | "customer" | "phone" | "total">;
 };
@@ -102,6 +125,7 @@ export interface DashboardSummary {
   stats: {
     totalOrders: Metric;
     confirmedOrders: Metric;
+    cancelledOrders: Metric;
     failedCalls: Metric;
     avgDuration: Metric;
   };
@@ -109,6 +133,10 @@ export interface DashboardSummary {
   recentCalls: (Call & { order: Pick<Order, "id" | "customer"> })[];
   pendingOrders: (Order & { callQueued: boolean })[];
   pendingCount: number;
+  actionCounts: {
+    retryable: number;
+    needsReview: number;
+  };
 }
 
 export type AnalyticsRange = "7d" | "30d" | "90d";
@@ -184,6 +212,48 @@ export interface Boutique {
   carrier: string | null;
   onboardingCompletedAt: string | null;
   onboarding: { completed: boolean; nextStep: 1 | 2 | 3 };
+}
+
+export interface Integration {
+  id: number;
+  name: string;
+  apiKeyPrefix: string;
+  webhookUrl: string | null;
+  enabled: boolean;
+  lastTestedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Plan {
+  code: string;
+  label: string;
+  /** Monthly price in TND. */
+  price: number;
+  /** Calls included per month. */
+  quota: number;
+}
+
+export interface BillingPlans {
+  plans: Plan[];
+  /** The plan that fits the shop's declared daily volume. */
+  recommended: string;
+  current: string;
+  currency: string;
+  payments: { available: boolean; testMode: boolean };
+}
+
+export interface Subscription {
+  plan: string;
+  payment: {
+    id: number;
+    amount: number;
+    currency: string;
+    reference: string;
+    cardBrand: string | null;
+    cardLast4: string | null;
+    testMode: boolean;
+  } | null;
 }
 
 export type BoutiqueSection = "identity" | "agent" | "details";
@@ -345,6 +415,21 @@ changePassword: (data: {
   }),
 
 boutique: () => request<Boutique>("/boutique"),
+  getIntegration: () => request<Integration | null>("/integrations"),
+  createIntegration: (data: { webhookUrl?: string }) =>
+    request<{ integration: Integration; apiKey: string; webhookSecret: string }>("/integrations", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateIntegration: (data: { webhookUrl?: string; enabled?: boolean }) =>
+    request<Integration>("/integrations", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  testIntegration: () =>
+    request<{ ok: true; integration: Integration }>("/integrations/test", {
+      method: "POST",
+    }),
 
 updateBoutique: (
   section: BoutiqueSection,
@@ -355,6 +440,13 @@ updateBoutique: (
     body: JSON.stringify(data),
   }),
 
+billingPlans: () => request<BillingPlans>("/billing/plans"),
+/** `paymentToken` is the card token from the payment provider, never a card number. */
+subscribe: (data: { plan: string; paymentToken?: string }) =>
+  request<Subscription>("/billing/subscribe", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
 completeOnboarding: () =>
   request<Boutique>("/boutique/onboarding/complete", {
     method: "POST",
@@ -364,12 +456,13 @@ completeOnboarding: () =>
   usage: () => request<Usage>("/calls/usage"),
   listCalls: (filters: CallFilters) =>
     request<CallsPage>(`/calls${query({ ...filters })}`),
-  getCall: (id: number) =>
-    request<CallWithOrder & { attempts: number }>(`/calls/${id}`),
+  getCall: (id: number) => request<CallDetail>(`/calls/${id}`),
   exportCalls: async (filters: Omit<CallFilters, "page">) =>
     (await send(`/calls/export${query({ ...filters })}`, undefined, true)).text(),
   queueCall: (orderId: number) =>
     request<Call>("/calls", { method: "POST", body: JSON.stringify({ orderId }) }),
+  retryCall: (orderId: number) =>
+    request<Call>("/calls/retry", { method: "POST", body: JSON.stringify({ orderId }) }),
   queueAllPending: () =>
     request<{ queued: number }>("/calls/queue-pending", { method: "POST" }),
   dispatchCall: (id: number) =>
@@ -405,5 +498,10 @@ completeOnboarding: () =>
     }),
   deleteOrder: (id: number) =>
     request<void>(`/orders/${id}`, { method: "DELETE" }),
+  listReclamations: (status?: ReclamationStatus) =>
+    request<Reclamation[]>(`/reclamations${query({ status })}`),
+  getReclamation: (id: number) => request<Reclamation>(`/reclamations/${id}`),
+  createReclamation: (data: { subject: string; description: string; orderId?: number }) =>
+    request<Reclamation>("/reclamations", { method: "POST", body: JSON.stringify(data) }),
 };
 

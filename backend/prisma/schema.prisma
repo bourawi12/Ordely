@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Order status: "pending" (awaiting confirmation), "confirmed" or "cancelled".
+/// Order status: "pending" (awaiting confirmation), "confirmed", "cancelled" or "unreachable".
 model Order {
   id         Int         @id @default(autoincrement())
   /// The shop the order belongs to: every read and write is scoped by it.
@@ -18,14 +18,18 @@ model Order {
   /// Order value in TND (3 decimals for millimes).
   total      Decimal     @default(0) @db.Decimal(10, 3)
   status     String      @default("pending") @db.VarChar(20)
+  source     String?     @db.VarChar(30)
+  externalOrderId String? @db.VarChar(120)
   createdAt  DateTime    @default(now()) @db.Timestamptz(6)
   items      OrderItem[]
   calls      Call[]
+  reclamations Reclamation[]
 
   @@index([boutiqueId, status])
   @@index([boutiqueId, createdAt])
   @@index([status])
   @@index([createdAt])
+  @@unique([boutiqueId, externalOrderId])
   @@map("orders")
 }
 
@@ -45,30 +49,37 @@ model OrderItem {
 /// One confirmation call attempt for an order.
 /// Status: "pending" (queued), "confirmed", "failed" or "no_answer".
 model Call {
-  id              Int      @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   orderId         Int
-  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  status          String   @default("pending") @db.VarChar(20)
-  attempt         Int      @default(1)
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status          String    @default("pending") @db.VarChar(20)
+  attempt         Int       @default(1)
   durationSeconds Int?
-  language        String?  @db.VarChar(30)
+  language        String?   @db.VarChar(30)
   /// [{ "speaker": "agent" | "customer", "text": string }]
   transcript      Json?
   recordingUrl    String?
-  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  // Voice agent (Ringio). Nothing here is set for calls made another way.
+  /// When the call was handed to the voice agent; null while still queued in Ordely.
+  dispatchedAt    DateTime? @db.Timestamptz(6)
+  /// The voice provider's own call id, for support and debugging.
+  providerCallId  String?   @db.VarChar(100)
+  /// Raw transcript fragments as streamed by the agent: [{ seq, speaker, text }].
+  /// `transcript` holds the readable version (consecutive fragments merged).
+  transcriptParts Json?
+  /// Private object-storage keys of the call audio: { agent?: key, customer?: key }.
+  recordingKeys   Json?
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
 
   /// UUID task ID for voice-agent correlation
   taskId          String?   @unique @db.VarChar(36)
   /// Provider's call ID (Ringio UUID), stored as correlation data
-  providerCallId  String?   @db.VarChar(100)
   /// Transport phase: dispatched, ringing, connected, ended, error, etc.
   transportPhase  String?   @db.VarChar(20)
   /// Business disposition from the agent: confirmed, declined, etc.
   disposition     String?   @db.VarChar(20)
   /// Human-readable failure reason shown in the dashboard
   failureReason   String?   @db.VarChar(500)
-  /// When the call was dispatched to the voice agent
-  dispatchedAt    DateTime? @db.Timestamptz(6)
   /// When the provider reported the call ended
   completedAt     DateTime? @db.Timestamptz(6)
   /// Marks this as a simulated test call
@@ -78,9 +89,11 @@ model Call {
   transcriptEntries CallTranscriptEntry[]
 
   @@index([orderId])
+  @@index([status, dispatchedAt])
   @@index([status])
   @@index([createdAt])
   @@index([taskId])
+  @@unique([orderId, attempt])
   @@map("calls")
 }
 
@@ -146,6 +159,7 @@ model User {
   /// granted by ADMIN_EMAIL at startup (src/admin/admin-bootstrap.service.ts) or in the database.
   isPlatformAdmin        Boolean   @default(false)
   createdAt              DateTime  @default(now()) @db.Timestamptz(6)
+  reclamations           Reclamation[]
 
   @@index([boutiqueId])
   @@map("users")
@@ -183,8 +197,76 @@ model Boutique {
   createdAt             DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   users                 User[]
+  integration           Integration?
   orders                Order[]
+  payments              Payment[]
+  reclamations          Reclamation[]
 
   @@index([createdAt])
   @@map("boutiques")
+}
+
+model Integration {
+  id             Int      @id @default(autoincrement())
+  boutiqueId     Int      @unique
+  boutique       Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  name           String   @default("Custom website") @db.VarChar(100)
+  apiKeyHash     String   @unique @db.VarChar(64)
+  apiKeyPrefix   String   @db.VarChar(20)
+  webhookUrl     String?  @db.VarChar(500)
+  webhookSecret  String   @db.VarChar(100)
+  enabled        Boolean  @default(true)
+  lastTestedAt   DateTime? @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt
+
+  @@map("integrations")
+}
+
+/// A support issue submitted by a merchant account.
+model Reclamation {
+  id          Int       @id @default(autoincrement())
+  boutiqueId  Int
+  boutique    Boutique  @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId     Int?
+  order       Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  subject     String    @db.VarChar(150)
+  description String    @db.VarChar(5000)
+  status      String    @default("open") @db.VarChar(20)
+  resolvedAt  DateTime? @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+
+  @@index([boutiqueId, createdAt])
+  @@index([status, createdAt])
+  @@index([orderId])
+  @@map("reclamations")
+}
+
+/// One attempt to pay for a plan, successful or not (the trail behind boutiques.plan).
+/// Never holds card data: only the brand and last four digits the provider reports.
+model Payment {
+  id            Int      @id @default(autoincrement())
+  boutiqueId    Int
+  boutique      Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  /// Plan code paid for ("starter", "growth", "pro").
+  plan          String   @db.VarChar(20)
+  /// Amount in TND (3 decimals for millimes).
+  amount        Decimal  @db.Decimal(10, 3)
+  currency      String   @default("TND") @db.VarChar(3)
+  /// "simulated" for now; a real gateway's name later.
+  provider      String   @db.VarChar(20)
+  /// "succeeded" or "failed".
+  status        String   @db.VarChar(20)
+  /// The provider's own id for the charge.
+  reference     String   @unique @db.VarChar(64)
+  cardBrand     String?  @db.VarChar(20)
+  cardLast4     String?  @db.VarChar(4)
+  failureReason String?  @db.VarChar(100)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([boutiqueId, createdAt])
+  @@map("payments")
 }

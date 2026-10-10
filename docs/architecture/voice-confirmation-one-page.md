@@ -50,7 +50,7 @@ Responsibilities:
 - collect transcript and artifacts
 - detect errors, no-answer, or session closure
 - end the call cleanly
-- send the result to the decision layer
+- forward Maria's structured result to the backend callback
 
 Owns:
 
@@ -64,79 +64,74 @@ Does not own:
 
 ---
 
+
 ### 3. Maria
 
-The customer-facing conversation agent.
+The customer-facing conversation agent and source of the structured customer-intent result.
 
 Responsibilities:
 
-- talk to the customer
-- confirm the order details
-- detect clear yes/no answers
-- ask clarifying questions
-- signal when the conversation has reached a terminal outcome
+- talk to the customer and read the order details
+- ask one or two concise, non-repetitive clarifying questions when needed
+- decide whether the customer confirmed, declined, or remains unclear
+- tell the customer the order is confirmed or cancelled before saying goodbye
+- report intent, confidence, and language after her spoken closing
 
 Owns:
 
-- customer interaction flow
+- the customer interaction and intent decision
 
 Does not own:
 
+- confidence policy or order eligibility
 - direct order mutation
-- final decision authority
-- live call teardown API calls
+- provider connection teardown
 
 Outputs:
 
-- customer_confirmed
-- customer_declined
-- ambiguous
-- no_answer
-- needs_more_context
+- CONFIRMED
+- CANCELLED
+- UNCLEAR
 
 ---
 
-### 4. Nora
+### 4. Backend decision policy
 
-The business decision agent.
+Validates Maria's result and determines the permitted next action.
 
 Responsibilities:
 
-- interpret transcript and order data together
-- apply policy rules
-- decide whether the order should be confirmed, cancelled, retried, or reviewed
-- return a validated decision
+- enforce the configurable 0.7 confidence threshold
+- confirm or cancel only while the order is still pending
+- retry unresolved calls under the existing three-attempt schedule
+- route only an unresolved third attempt to human review
 
 Owns:
 
-- outcome interpretation and policy compliance
+- order eligibility, policy enforcement, and retry/review routing
 
 Does not own:
 
+- live customer speech
 - telephony session lifecycle
-- direct customer speech
-- direct order write without a backend service
 
 Outputs:
 
-- confirmed
-- cancelled
+- confirmed or cancelled order update
 - retry_later
-- manual_review_required
+- `needs_human` after the final unresolved attempt
 - policy_blocked
 
 ---
 
 ### 5. Final order write service
 
-The final state mutation boundary.
+Persists allowed decisions.
 
 Responsibilities:
 
-- accept a validated decision
 - update the order record safely
-- add audit trail or notes
-- update review queues if needed
+- record the result and review reason
 
 Owns:
 
@@ -147,53 +142,22 @@ Does not own:
 - customer conversation
 - call session state
 
----
-
 ## Core flow
 
-1. Pending order exists.
-2. Call orchestration starts a call task.
-3. Runtime session creates the live session.
-4. Maria talks to the customer.
-5. Runtime captures transcript and call outcome.
-6. Nora evaluates the transcript and order against policy.
-7. Nora returns a valid business decision.
-8. Final order write service updates the order.
-9. The system triggers the next action: confirm, retry, cancel, or review.
-
----
-
-## Safety rules
-
-- Do not let Maria directly write the order state.
-- Do not let the runtime directly update the order state.
-- A call can end without the order being confirmed.
-- A customer conversation can be complete without a business decision being applied.
-- Order mutation happens only through the final write service.
+1. Orchestration dispatches an eligible pending order to Maria.
+2. Maria asks for confirmation and may ask one or two concise clarifying questions.
+3. Maria tells the customer whether the order is confirmed or cancelled, says goodbye, then reports intent, confidence, and language.
+4. The runtime waits for her final audio to drain, ends the call, and sends the result to Ordely.
+5. Backend policy checks confidence (at least 0.7) and that the order remains pending before updating it.
+6. Unclear results retry after 30 minutes and then two hours; an unresolved third attempt is marked `needs_human` and the order becomes `unreachable` until an operator explicitly retries it.
 
 ---
 
 ## State model summary
 
-Call states may include:
+Persisted call statuses are pending, confirmed, failed, and no_answer. A `needs_human` disposition is a final review marker after attempt three; an `ambiguous` disposition remains retryable before then.
 
-- queued
-- dispatched
-- connected
-- speaking
-- ended
-- failed
-- no_answer
-- needs_human_review
-
-Order states may include:
-
-- pending
-- awaiting_confirmation
-- confirmed
-- cancelled
-- retry_scheduled
-- manual_review_required
+Persisted order statuses are pending, confirmed, cancelled, and unreachable. Retries leave the order pending; final review marks it unreachable.
 
 ---
 
@@ -203,7 +167,7 @@ This layered model keeps the system clear:
 
 - the runtime owns the call
 - Maria owns the conversation
-- Nora owns the decision
+- Maria owns customer intent; backend policy owns eligibility and retry/review decisions.
 - the final service owns the order mutation
 
 This is the correct split for a safe confirmation workflow.

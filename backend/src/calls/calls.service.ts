@@ -6,25 +6,41 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { DAY_MS, DEFAULT_TIMEZONE, startOf } from '../common/time';
+import { PLANS } from '../admin/plans';
+import { currentPlan } from '../billing/billing.rules';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import {
+  isWithinCallWindow,
+  nextAttemptNumber,
+} from './orchestration/call-orchestration-policy';
 import { CALL_STATUSES, CallRange, CallStatus } from './call-status';
 import { CallFiltersDto, ListCallsDto } from './dto/list-calls.dto';
 import { UpdateCallDto } from './dto/update-call.dto';
 
 const EXPORT_LIMIT = 10_000;
-const DEFAULT_PLAN_CALL_LIMIT = 500;
 
 const withOrder = {
   order: { select: { id: true, customer: true, phone: true, total: true } },
 } satisfies Prisma.CallInclude;
 
 /** Calls belong to a shop through their order: every query is scoped by `order.boutiqueId`. */
+/** A call as the API returns it: without the voice agent's raw fragments and storage keys. */
+function publicCall<
+  T extends { transcriptParts?: unknown; recordingKeys?: unknown },
+>(call: T): Omit<T, 'transcriptParts' | 'recordingKeys'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { transcriptParts, recordingKeys, ...rest } = call;
+  return rest;
+}
+
 @Injectable()
 export class CallsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
     private readonly realtimeService: RealtimeService,
   ) {}
 
@@ -59,7 +75,7 @@ export class CallsService {
     }
 
     return {
-      items,
+      items: items.map(publicCall),
       total,
       page: query.page,
       pageSize: query.pageSize,
@@ -127,14 +143,29 @@ export class CallsService {
     const attempts = await this.prisma.call.count({
       where: { orderId: call.orderId },
     });
-    return { ...call, attempts };
+    // Voice agent recordings are private: short-lived signed links, one per speaker.
+    const keys = (call.recordingKeys ?? {}) as {
+      agent?: string;
+      customer?: string;
+    };
+    const recordings = {
+      agent: keys.agent ? await this.storage.url(keys.agent) : null,
+      customer: keys.customer ? await this.storage.url(keys.customer) : null,
+    };
+    return {
+      ...publicCall(call),
+      recordingUrl:
+        call.recordingUrl ?? recordings.customer ?? recordings.agent,
+      recordings,
+      attempts,
+    };
   }
 
   /** Records the outcome of a call (status, duration, transcript, …). */
   async update(boutiqueId: number, id: number, dto: UpdateCallDto) {
     await this.findOne(boutiqueId, id);
 
-  const updated = await this.prisma.call.update({
+    const updated = await this.prisma.call.update({
       where: { id },
       data: {
         status: dto.status,
@@ -170,7 +201,17 @@ export class CallsService {
   async queue(boutiqueId: number, orderId: number) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, boutiqueId },
-      include: { calls: { select: { status: true } } },
+      include: {
+        boutique: { select: { callStartTime: true, callEndTime: true } },
+        calls: {
+          select: {
+            status: true,
+            attempt: true,
+            disposition: true,
+            completedAt: true,
+          },
+        },
+      },
     });
     if (!order) {
       throw new NotFoundException(`Order ${orderId} not found`);
@@ -180,13 +221,29 @@ export class CallsService {
         `Order ${orderId} is already ${order.status}`,
       );
     }
+    if (
+      !isWithinCallWindow(
+        order.boutique.callStartTime,
+        order.boutique.callEndTime,
+      )
+    ) {
+      throw new ConflictException(
+        'Calls can only be queued during the boutique calling window.',
+      );
+    }
     if (order.calls.some((c) => c.status === 'pending')) {
       throw new ConflictException(
         `A call is already queued for order ${orderId}`,
       );
     }
+    const attempt = nextAttemptNumber(order.calls);
+    if (attempt === null) {
+      throw new ConflictException(
+        `No call attempt is currently eligible for order ${orderId}`,
+      );
+    }
     const created = await this.prisma.call.create({
-      data: { orderId, attempt: order.calls.length + 1 },
+      data: { orderId, attempt },
       include: withOrder,
     });
 
@@ -208,12 +265,88 @@ export class CallsService {
         status: 'pending',
         calls: { none: { status: 'pending' } },
       },
-      select: { id: true, _count: { select: { calls: true } } },
+      select: {
+        id: true,
+        boutique: { select: { callStartTime: true, callEndTime: true } },
+        calls: {
+          select: {
+            status: true,
+            attempt: true,
+            disposition: true,
+            completedAt: true,
+          },
+        },
+      },
     });
-    await this.prisma.call.createMany({
-      data: orders.map((o) => ({ orderId: o.id, attempt: o._count.calls + 1 })),
+    const data = orders.flatMap((order) => {
+      if (
+        !isWithinCallWindow(
+          order.boutique.callStartTime,
+          order.boutique.callEndTime,
+        )
+      ) {
+        return [];
+      }
+      const attempt = nextAttemptNumber(order.calls);
+      return attempt === null ? [] : [{ orderId: order.id, attempt }];
     });
-    return { queued: orders.length };
+    if (data.length === 0) return { queued: 0 };
+    const result = await this.prisma.call.createMany({
+      data,
+      skipDuplicates: true,
+    });
+    return { queued: result.count };
+  }
+
+  /** Moves an unreachable order back into the normal call queue. */
+  async retryAfterReview(boutiqueId: number, orderId: number) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, boutiqueId },
+        select: {
+          status: true,
+          calls: {
+            select: { status: true, attempt: true, disposition: true },
+            orderBy: { attempt: 'desc' },
+          },
+        },
+      });
+      if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+      if (order.status !== 'unreachable') {
+        throw new ConflictException(
+          `Order ${orderId} is not ready for a manual retry`,
+        );
+      }
+      if (order.calls.some((call) => call.status === 'pending')) {
+        throw new ConflictException(`A call is already queued for order ${orderId}`);
+      }
+      if (order.calls.length === 0) {
+        throw new ConflictException(
+          `Order ${orderId} does not have a completed call to retry`,
+        );
+      }
+
+      const attempt = Math.max(...order.calls.map((call) => call.attempt)) + 1;
+      const reopened = await tx.order.updateMany({
+        where: { id: orderId, boutiqueId, status: 'unreachable' },
+        data: { status: 'pending' },
+      });
+      if (reopened.count === 0) {
+        throw new ConflictException(`Order ${orderId} changed before retry`);
+      }
+      return tx.call.create({
+        data: { orderId, attempt },
+        include: withOrder,
+      });
+    });
+
+    this.realtimeService.emitCallStatusChanged(boutiqueId, {
+      callId: result.id,
+      orderId: result.orderId,
+      status: result.status,
+      updatedAt: result.createdAt.toISOString(),
+    });
+    return result;
   }
 
   async usage(boutiqueId: number) {
@@ -221,13 +354,13 @@ export class CallsService {
     const used = await this.prisma.call.count({
       where: { createdAt: { gte: since }, order: { boutiqueId } },
     });
-    return {
-      plan: this.config.get<string>('PLAN_NAME', 'Free plan'),
-      used,
-      limit: Number(
-        this.config.get('PLAN_CALL_LIMIT', DEFAULT_PLAN_CALL_LIMIT),
-      ),
-    };
+    // The shop's own plan and its monthly quota (free until it subscribes).
+    const shop = await this.prisma.boutique.findUnique({
+      where: { id: boutiqueId },
+      select: { plan: true, planStartedAt: true, churnedAt: true },
+    });
+    const plan = shop ? currentPlan(shop) : PLANS[0];
+    return { plan: `${plan.label} plan`, used, limit: plan.quota };
   }
 
   private async baseWhere(

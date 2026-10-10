@@ -4,8 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Order } from '@prisma/client';
+import { CallOrchestratorService } from '../calls/orchestration/call-orchestrator.service';
+import { nextAttemptAt } from '../calls/orchestration/call-orchestration-policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { IntegrationWebhookService } from '../integrations/integration-webhook.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus, UpdateOrderDto } from './dto/update-order.dto';
 
@@ -43,14 +46,36 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeService: RealtimeService,
+    private readonly callOrchestrator: CallOrchestratorService,
+    private readonly integrationWebhook: IntegrationWebhookService,
   ) {}
 
-  findAll(boutiqueId: number, status?: OrderStatus): Promise<Order[]> {
-    return this.prisma.order.findMany({
+  async findAll(boutiqueId: number, status?: OrderStatus) {
+    const orders = await this.prisma.order.findMany({
       where: status ? { boutiqueId, status } : { boutiqueId },
-      include: { items: true },
+      include: {
+        items: true,
+        calls: {
+          select: {
+            status: true,
+            attempt: true,
+            disposition: true,
+            completedAt: true,
+            createdAt: true,
+          },
+          orderBy: { attempt: 'desc' },
+        },
+      },
       orderBy: { id: 'desc' },
     });
+
+    return orders.map(({ calls, ...order }) => ({
+      ...order,
+      callCount: calls.length,
+      nextCallAt:
+        calls.find((call) => call.status === 'pending')?.createdAt ??
+        (order.status === 'pending' ? nextAttemptAt(calls) : null),
+    }));
   }
 
   async findOne(boutiqueId: number, id: number) {
@@ -81,6 +106,8 @@ export class OrdersService {
         phone: dto.phone,
         total: computedTotal,
         boutiqueId,
+        ...(dto.source ? { source: dto.source } : {}),
+        ...(dto.externalOrderId ? { externalOrderId: dto.externalOrderId } : {}),
         items: {
           create: dto.items.map((i) => ({
             productName: i.productName,
@@ -97,6 +124,7 @@ export class OrdersService {
       status: created.status,
       createdAt: created.createdAt.toISOString(),
     });
+    void this.callOrchestrator.pollOnce();
 
     return created;
   }
@@ -118,6 +146,7 @@ export class OrdersService {
         status: updated.status,
         updatedAt: new Date().toISOString(),
       });
+      void this.integrationWebhook.notifyOrderStatus(boutiqueId, updated.id, updated.status);
     }
     return updated;
   }
@@ -286,6 +315,7 @@ export class OrdersService {
         status: 'imported',
         createdAt: new Date().toISOString(),
       });
+      void this.callOrchestrator.pollOnce();
     }
 
     return {

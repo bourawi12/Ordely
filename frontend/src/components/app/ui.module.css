@@ -156,7 +156,8 @@
 }
 
 .failed,
-.cancelled {
+.cancelled,
+.unreachable {
   background: var(--fail-bg);
   color: var(--fail-text);
 }

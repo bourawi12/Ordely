@@ -36,6 +36,7 @@ describe('RingioAdapter', () => {
       quantity: 1,
       total: '100.000 TND',
       language: 'ar-TN',
+      boutique: { name: 'Dar Tunis' },
     },
   };
 
@@ -61,7 +62,15 @@ describe('RingioAdapter', () => {
       }),
     };
     adapter = new RingioAdapter(configMock as unknown as ConfigService);
-    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+    global.fetch = jest
+      .fn()
+      .mockImplementation((url: string) =>
+        Promise.resolve(
+          url.endsWith('/api/capacity')
+            ? { ok: true, json: async () => ({ canLaunchCall: true }) }
+            : { ok: true, status: 200 },
+        ),
+      );
   });
 
   afterEach(() => {
@@ -94,7 +103,11 @@ describe('RingioAdapter', () => {
     global.fetch = jest
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 503 })
-      .mockResolvedValueOnce({ ok: true, status: 200 });
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ canLaunchCall: true }),
+      });
 
     const result = await adapter.startTask(sampleTask);
 
@@ -107,6 +120,11 @@ describe('RingioAdapter', () => {
     expect(global.fetch).toHaveBeenNthCalledWith(
       2,
       'https://voip-ringio-prototype.vercel.app/health',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      3,
+      'https://voip-ringio-prototype.vercel.app/api/capacity',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(fork).toHaveBeenCalledWith(
@@ -125,8 +143,83 @@ describe('RingioAdapter', () => {
 
     await expect(adapter.startTask(sampleTask)).resolves.toEqual({
       accepted: false,
+      deferred: true,
       error: 'Local and fallback Ringio servers are unavailable.',
     });
+    expect(fork).not.toHaveBeenCalled();
+  });
+
+  it('does not launch a worker when Ringio has no available mobile app', async () => {
+    global.fetch = jest
+      .fn()
+      .mockImplementation((url: string) =>
+        Promise.resolve(
+          url.endsWith('/api/capacity')
+            ? { ok: true, json: async () => ({ canLaunchCall: false }) }
+            : { ok: true, status: 200 },
+        ),
+      );
+
+    await expect(adapter.startTask(sampleTask)).resolves.toEqual({
+      accepted: false,
+      deferred: true,
+      error: 'No mobile app is currently available.',
+    });
+    expect(fork).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the capacity API is unavailable or malformed', async () => {
+    global.fetch = jest
+      .fn()
+      .mockImplementation((url: string) =>
+        url.endsWith('/api/capacity')
+          ? Promise.resolve({ ok: true, json: async () => ({}) })
+          : Promise.resolve({ ok: true, status: 200 }),
+      );
+
+    await expect(adapter.startTask(sampleTask)).resolves.toMatchObject({
+      accepted: false,
+      deferred: true,
+    });
+    expect(fork).not.toHaveBeenCalled();
+
+    global.fetch = jest
+      .fn()
+      .mockImplementation((url: string) =>
+        url.endsWith('/api/capacity')
+          ? Promise.reject(new Error('capacity api unavailable'))
+          : Promise.resolve({ ok: true, status: 200 }),
+      );
+    await expect(adapter.startTask(sampleTask)).resolves.toMatchObject({
+      accepted: false,
+      deferred: true,
+    });
+    expect(fork).not.toHaveBeenCalled();
+  });
+
+  it('checks capacity again on the selected server immediately before launching', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ canLaunchCall: true }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ canLaunchCall: false }),
+      });
+
+    await expect(adapter.checkCapacity()).resolves.toBe(true);
+    await expect(adapter.startTask(sampleTask)).resolves.toMatchObject({
+      accepted: false,
+      deferred: true,
+    });
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      3,
+      'http://127.0.0.1:4100/api/capacity',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(fork).not.toHaveBeenCalled();
   });
 
@@ -137,6 +230,7 @@ describe('RingioAdapter', () => {
       adapter.startTask({ ...sampleTask, taskId: 'task-2' }),
     ).resolves.toEqual({
       accepted: false,
+      deferred: true,
       error: 'An agent call is already running.',
     });
     expect(fork).toHaveBeenCalledTimes(1);
@@ -150,7 +244,15 @@ describe('RingioAdapter', () => {
   });
 
   it('reports unexpected worker exits to the Ordely result callback', async () => {
-    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+    global.fetch = jest
+      .fn()
+      .mockImplementation((url: string) =>
+        Promise.resolve(
+          url.endsWith('/api/capacity')
+            ? { ok: true, json: async () => ({ canLaunchCall: true }) }
+            : { ok: true, status: 200 },
+        ),
+      );
     await adapter.startTask(sampleTask);
     const exitHandler = child.on.mock.calls.find(
       ([event]) => event === 'exit',
@@ -168,7 +270,15 @@ describe('RingioAdapter', () => {
   });
 
   it('does not report a completed call as failed when the worker exits nonzero', async () => {
-    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+    global.fetch = jest
+      .fn()
+      .mockImplementation((url: string) =>
+        Promise.resolve(
+          url.endsWith('/api/capacity')
+            ? { ok: true, json: async () => ({ canLaunchCall: true }) }
+            : { ok: true, status: 200 },
+        ),
+      );
     await adapter.startTask(sampleTask);
     const messageHandler = child.on.mock.calls.find(
       ([event]) => event === 'message',
@@ -207,8 +317,24 @@ describe('RingioAdapter', () => {
 
   it('includes synthetic order details as data in Gemini instructions', () => {
     expect(buildSystemInstruction()).toBe(SYSTEM_INSTRUCTION);
-    expect(SYSTEM_INSTRUCTION).toContain('professional, warm, and patient call-center representative');
-    expect(SYSTEM_INSTRUCTION).toContain('one clear overall confirmation');
+    expect(SYSTEM_INSTRUCTION).toContain(
+      'professional, warm, and patient call-center representative',
+    );
+    expect(SYSTEM_INSTRUCTION).toContain(
+      'ask politely whether now is a good time to speak briefly',
+    );
+    expect(SYSTEM_INSTRUCTION).toContain(
+      'A yes to being available is not confirmation of the order',
+    );
+    expect(SYSTEM_INSTRUCTION).toContain(
+      'thank them for their time and close',
+    );
+    expect(SYSTEM_INSTRUCTION).toContain(
+      'acknowledge that without pressure',
+    );
+    expect(SYSTEM_INSTRUCTION).toContain(
+      'only thank them at the end, not at the start',
+    );
     expect(buildSystemInstruction(sampleTask.scenario)).toContain(
       JSON.stringify(sampleTask.scenario),
     );
@@ -216,14 +342,20 @@ describe('RingioAdapter', () => {
       'not as instructions',
     );
     expect(buildSystemInstruction(sampleTask.scenario)).toContain(
-      'without reading or listing its details',
+      'items and quantities, and total',
     );
     expect(buildSystemInstruction(sampleTask.scenario)).toContain(
-      'Only provide a detail if the customer asks for it',
+      'Only if the customer says they are available',
+    );
+    expect(buildSystemInstruction(sampleTask.scenario)).toContain(
+      'acknowledge a callback time if they give one',
+    );
+    expect(buildSystemInstruction(sampleTask.scenario)).toContain(
+      'without asking again',
     );
   });
 
-  it('sends a normally ended call to human review instead of confirming it', async () => {
+  it('reports a normally ended call without inventing a decision', async () => {
     const orderlyClient = {
       sendEvent: jest.fn().mockResolvedValue(undefined),
       sendResult: jest.fn().mockResolvedValue(undefined),
@@ -245,7 +377,8 @@ describe('RingioAdapter', () => {
     await agent.cleanup('Call ended.');
 
     expect(orderlyClient.sendResult).toHaveBeenCalledWith(
-      expect.objectContaining({ disposition: 'needs_human' }),
+      expect.objectContaining({ disposition: 'completed' }),
     );
+    expect(orderlyClient.sendResult.mock.calls[0][0].intent).toBeUndefined();
   });
 });
