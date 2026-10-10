@@ -1,5 +1,5 @@
 import "server-only";
-import { request, send } from "./api";
+import { request, send, type Reclamation, type ReclamationStatus } from "./api";
 
 /**
  * The internal back office API (/api/admin/*): Ordely team only, enforced by the backend
@@ -8,6 +8,10 @@ import { request, send } from "./api";
 
 export type PeriodRange = "7d" | "30d" | "90d" | "custom";
 export type MerchantStatus = "active" | "new" | "dormant" | "churned";
+
+export interface ReclamationsQuery {
+  status?: ReclamationStatus;
+}
 
 export interface PeriodQuery {
   range?: PeriodRange;
@@ -227,6 +231,14 @@ export const adminApi = {
   merchant: (id: number, q: PeriodQuery) =>
     request<MerchantDetail>(`/admin/merchants/${id}${qs(q)}`),
   cohorts: (weeks?: number) => request<Cohorts>(`/admin/cohorts${qs({ weeks })}`),
+  reclamations: (q: ReclamationsQuery = {}) =>
+    request<Reclamation[]>(`/admin/reclamations${qs(q)}`),
+  reclamation: (id: number) => request<Reclamation>(`/admin/reclamations/${id}`),
+  updateReclamationStatus: (id: number, status: ReclamationStatus) =>
+    request<Reclamation>(`/admin/reclamations/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
   exportCsv: async (dataset: ExportDataset, search: string) =>
     (await send(`/admin/export/${dataset}${search}`, undefined, true)).text(),
 };

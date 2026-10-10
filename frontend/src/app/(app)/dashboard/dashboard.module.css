@@ -6,7 +6,7 @@
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1.5rem;
 }
 
@@ -63,6 +63,81 @@
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 1.75rem;
+}
+
+.actionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.actionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.actionCard:hover,
+.actionCard:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.actionCardAlert {
+  border-color: color-mix(in srgb, var(--fail-text) 35%, var(--border));
+}
+
+.actionLabel,
+.actionHint {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.actionValue {
+  font-size: 1.8rem;
+  line-height: 1.1;
+}
+
+.actionHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--accent);
+}
+
+.reviewList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.reviewList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.reviewList a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  color: inherit;
+}
+
+.reviewList span {
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 /* Bar chart */
@@ -156,6 +231,10 @@
   }
 
   .middle {
+    grid-template-columns: 1fr;
+  }
+
+  .actionGrid {
     grid-template-columns: 1fr;
   }
 }

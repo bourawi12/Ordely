@@ -6,6 +6,7 @@ import type { ThemeMode } from "./theme";
 export type OrderStatus = "pending" | "confirmed" | "cancelled" | "unreachable";
 export type CallStatus = "pending" | "confirmed" | "failed" | "no_answer";
 export type CallRange = "today" | "7d" | "30d" | "all";
+export type ReclamationStatus = "open" | "in_progress" | "resolved";
 
 export interface OrderItem {
   id: number;
@@ -26,6 +27,20 @@ export interface Order {
   items?: OrderItem[];
   callCount?: number;
   nextCallAt?: string | null;
+}
+
+export interface Reclamation {
+  id: number;
+  subject: string;
+  description: string;
+  status: ReclamationStatus;
+  orderId: number | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: { id: number; name: string; email: string };
+  order: { id: number; customer: string; total: string } | null;
+  boutique?: { id: number; name: string | null };
 }
 
 export interface TranscriptLine {
@@ -110,6 +125,7 @@ export interface DashboardSummary {
   stats: {
     totalOrders: Metric;
     confirmedOrders: Metric;
+    cancelledOrders: Metric;
     failedCalls: Metric;
     avgDuration: Metric;
   };
@@ -117,6 +133,10 @@ export interface DashboardSummary {
   recentCalls: (Call & { order: Pick<Order, "id" | "customer"> })[];
   pendingOrders: (Order & { callQueued: boolean })[];
   pendingCount: number;
+  actionCounts: {
+    retryable: number;
+    needsReview: number;
+  };
 }
 
 export type AnalyticsRange = "7d" | "30d" | "90d";
@@ -452,5 +472,10 @@ completeOnboarding: () =>
     }),
   deleteOrder: (id: number) =>
     request<void>(`/orders/${id}`, { method: "DELETE" }),
+  listReclamations: (status?: ReclamationStatus) =>
+    request<Reclamation[]>(`/reclamations${query({ status })}`),
+  getReclamation: (id: number) => request<Reclamation>(`/reclamations/${id}`),
+  createReclamation: (data: { subject: string; description: string; orderId?: number }) =>
+    request<Reclamation>("/reclamations", { method: "POST", body: JSON.stringify(data) }),
 };
 

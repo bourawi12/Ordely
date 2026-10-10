@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Order status: "pending" (awaiting confirmation), "confirmed" or "cancelled".
+/// Order status: "pending" (awaiting confirmation), "confirmed", "cancelled" or "unreachable".
 model Order {
   id         Int         @id @default(autoincrement())
   /// The shop the order belongs to: every read and write is scoped by it.
@@ -21,6 +21,7 @@ model Order {
   createdAt  DateTime    @default(now()) @db.Timestamptz(6)
   items      OrderItem[]
   calls      Call[]
+  reclamations Reclamation[]
 
   @@index([boutiqueId, status])
   @@index([boutiqueId, createdAt])
@@ -155,6 +156,7 @@ model User {
   /// granted by ADMIN_EMAIL at startup (src/admin/admin-bootstrap.service.ts) or in the database.
   isPlatformAdmin        Boolean   @default(false)
   createdAt              DateTime  @default(now()) @db.Timestamptz(6)
+  reclamations           Reclamation[]
 
   @@index([boutiqueId])
   @@map("users")
@@ -194,9 +196,32 @@ model Boutique {
   users                 User[]
   orders                Order[]
   payments              Payment[]
+  reclamations          Reclamation[]
 
   @@index([createdAt])
   @@map("boutiques")
+}
+
+/// A support issue submitted by a merchant account.
+model Reclamation {
+  id          Int       @id @default(autoincrement())
+  boutiqueId  Int
+  boutique    Boutique  @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId     Int?
+  order       Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  subject     String    @db.VarChar(150)
+  description String    @db.VarChar(5000)
+  status      String    @default("open") @db.VarChar(20)
+  resolvedAt  DateTime? @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+
+  @@index([boutiqueId, createdAt])
+  @@index([status, createdAt])
+  @@index([orderId])
+  @@map("reclamations")
 }
 
 /// One attempt to pay for a plan, successful or not (the trail behind boutiques.plan).

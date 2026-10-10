@@ -51,13 +51,14 @@ Persisted order states are:
 - pending
 - confirmed
 - cancelled
+- unreachable after the final unsuccessful confirmation attempt
 
 ### Typical transitions
 
 - pending -> confirmed after a clear, confident confirmation
 - pending -> cancelled after a clear, confident decline
 - pending -> pending while unresolved attempts are retried
-- pending -> pending when the final unresolved call is marked for staff review
+- pending -> unreachable when the final unresolved call is marked for staff review
 
 ### Important rule
 

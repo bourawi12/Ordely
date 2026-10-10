@@ -14,6 +14,7 @@ import { MailModule } from './mail/mail.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { ReclamationsModule } from './reclamations/reclamations.module';
 import { StorageModule } from './storage/storage.module';
 import { VoiceModule } from './voice/voice.module';
 
@@ -33,6 +34,7 @@ import { VoiceModule } from './voice/voice.module';
     DashboardModule,
     AnalyticsModule,
     RealtimeModule,
+    ReclamationsModule,
     AdminModule,
     VoiceModule,
     BillingModule,

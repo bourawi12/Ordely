@@ -18,6 +18,7 @@ export interface CallStatusChangedPayload {
   orderId: number;
   status: string;
   updatedAt: string;
+  transportPhase?: string | null;
 }
 
 /** Emits real-time events to authenticated boutique rooms. */
