@@ -40,4 +40,46 @@ describe('DashboardService', () => {
       }),
     );
   });
+
+  it('returns shop-scoped action counts for retryable and review calls', async () => {
+    const callCount = jest.fn(({ where }) => {
+      if (where.disposition === 'needs_human') return Promise.resolve(4);
+      if (where.order?.status?.in) return Promise.resolve(6);
+      return Promise.resolve(0);
+    });
+    const prisma = {
+      order: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      call: {
+        count: callCount,
+        aggregate: jest.fn().mockResolvedValue({ _avg: { durationSeconds: null } }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+    const service = new DashboardService(
+      prisma as never,
+      { get: jest.fn().mockReturnValue('Africa/Tunis') } as never,
+    );
+
+    const summary = await service.summary(42);
+
+    expect(summary.actionCounts).toEqual({ retryable: 6, needsReview: 4 });
+    expect(callCount).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        order: {
+          boutiqueId: 42,
+          status: { in: ['pending', 'unreachable'] },
+        },
+      }),
+    });
+    expect(callCount).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        disposition: 'needs_human',
+        order: { boutiqueId: 42, status: 'unreachable' },
+      }),
+    });
+  });
 });

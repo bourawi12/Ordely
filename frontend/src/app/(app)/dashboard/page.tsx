@@ -41,9 +41,10 @@ function StatCard({
 }
 
 export default async function DashboardPage() {
-  const { stats, week, recentCalls, pendingOrders, pendingCount } = await api.dashboard();
+  const { stats, week, recentCalls, pendingOrders, pendingCount, actionCounts } = await api.dashboard();
   const now = Date.now();
   const peak = Math.max(1, ...week.map((d) => d.confirmed));
+  const reviewCalls = recentCalls.filter((call) => call.disposition === "needs_human");
 
   return (
     <div className={styles.page}>
@@ -78,6 +79,46 @@ export default async function DashboardPage() {
           value={formatDuration(stats.avgDuration.value).replace(/^0m /, "")}
           change={secondsChange(stats.avgDuration.value, stats.avgDuration.previous)}
         />
+      </section>
+
+      <section className={`${ui.card} ${ui.cardPad}`} aria-labelledby="action-queue-title">
+        <div className={ui.cardHead}>
+          <div>
+            <h2 id="action-queue-title" className={ui.cardTitle}>Action queue</h2>
+            <p className={ui.muted}>The work that needs attention first.</p>
+          </div>
+          {pendingCount > 0 && <CallAllPendingButton disabled={false} />}
+        </div>
+        <div className={styles.actionGrid}>
+          <Link href="/orders?status=pending" className={styles.actionCard}>
+            <span className={styles.actionLabel}>Pending</span>
+            <strong className={styles.actionValue}>{pendingCount}</strong>
+            <span className={styles.actionHint}>Open the order queue <Icon name="arrow" size={15} /></span>
+          </Link>
+          <Link href="/call-logs?range=all&status=failed" className={styles.actionCard}>
+            <span className={styles.actionLabel}>Failed or no answer</span>
+            <strong className={styles.actionValue}>{actionCounts.retryable}</strong>
+            <span className={styles.actionHint}>Review recent attempts <Icon name="arrow" size={15} /></span>
+          </Link>
+          <Link href="/call-logs?range=all" className={`${styles.actionCard} ${actionCounts.needsReview ? styles.actionCardAlert : ""}`}>
+            <span className={styles.actionLabel}>Needs human review</span>
+            <strong className={styles.actionValue}>{actionCounts.needsReview}</strong>
+            <span className={styles.actionHint}>Open call details <Icon name="arrow" size={15} /></span>
+          </Link>
+        </div>
+        {reviewCalls.length > 0 && (
+          <ul className={styles.reviewList} aria-label="Calls needing review">
+            {reviewCalls.slice(0, 3).map((call) => (
+              <li key={call.id}>
+                <Link href={`/call-logs?range=all&call=${call.id}`}>
+                  <strong>{call.order.customer}</strong>
+                  <span>Order #{call.order.id} · review outcome</span>
+                </Link>
+                <StatusBadge status={call.status} />
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <div className={styles.middle}>

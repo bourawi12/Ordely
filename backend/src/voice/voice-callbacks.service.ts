@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import {
   VoiceEventDto,
   VoiceRecordingDto,
@@ -46,6 +47,7 @@ export class VoiceCallbacksService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly config: ConfigService,
+    private readonly realtimeService: RealtimeService,
   ) {}
 
   private get minConfidence() {
@@ -61,7 +63,10 @@ export class VoiceCallbacksService {
   private async dispatchedCall(taskId: string) {
     const id = callIdFrom(taskId);
     const call = id
-      ? await this.prisma.call.findUnique({ where: { id } })
+      ? await this.prisma.call.findUnique({
+          where: { id },
+          include: { order: { select: { boutiqueId: true } } },
+        })
       : null;
     if (!call || !call.dispatchedAt) {
       throw new NotFoundException('Unknown task');
@@ -77,6 +82,13 @@ export class VoiceCallbacksService {
         data: { providerCallId: dto.providerCallId },
       });
     }
+    this.realtimeService.emitCallStatusChanged(call.order.boutiqueId, {
+      callId: call.id,
+      orderId: call.orderId,
+      status: call.status,
+      transportPhase: dto.phase,
+      updatedAt: new Date().toISOString(),
+    });
     this.logger.log(`Call ${call.id}: ${dto.phase}`);
     return { ok: true };
   }
@@ -160,7 +172,7 @@ export class VoiceCallbacksService {
     const language = dto.language
       ? LANGUAGE_LABELS[dto.language as LanguageCode]
       : undefined;
-    const applied = await this.prisma.$transaction(async (tx) => {
+    const transition = await this.prisma.$transaction(async (tx) => {
       const { count } = await tx.call.updateMany({
         where: { id: call.id, status: 'pending' },
         data: {
@@ -171,24 +183,43 @@ export class VoiceCallbacksService {
             !call.providerCallId && { providerCallId: dto.providerCallId }),
         },
       });
-      if (count === 0) return false;
+      if (count === 0) return { applied: false, orderStatus: null };
+      let orderStatus: string | null = null;
       if (outcome === 'confirmed' || outcome === 'cancelled') {
         // Never overrides an order the merchant already settled.
-        await tx.order.updateMany({
+        const orderUpdate = await tx.order.updateMany({
           where: { id: call.orderId, status: 'pending' },
           data: { status: outcome },
         });
+        if (orderUpdate.count > 0) orderStatus = outcome;
       } else if (call.attempt >= MAX_ATTEMPTS) {
-        await tx.order.updateMany({
+        const orderUpdate = await tx.order.updateMany({
           where: { id: call.orderId, status: 'pending' },
           data: { status: 'unreachable' },
         });
+        if (orderUpdate.count > 0) orderStatus = 'unreachable';
       }
-      return true;
+      return { applied: true, orderStatus };
     });
+    if (transition.applied) {
+      const updatedAt = new Date().toISOString();
+      this.realtimeService.emitCallStatusChanged(call.order.boutiqueId, {
+        callId: call.id,
+        orderId: call.orderId,
+        status: CALL_STATUS[outcome],
+        updatedAt,
+      });
+      if (transition.orderStatus) {
+        this.realtimeService.emitOrderStatusChanged(call.order.boutiqueId, {
+          orderId: call.orderId,
+          status: transition.orderStatus,
+          updatedAt,
+        });
+      }
+    }
     this.logger.log(
-      `Call ${call.id} result: ${dto.disposition} ${dto.intent ?? '-'} ${dto.confidence ?? '-'} → ${outcome}${applied ? '' : ' (already closed, ignored)'}`,
+      `Call ${call.id} result: ${dto.disposition} ${dto.intent ?? '-'} ${dto.confidence ?? '-'} → ${outcome}${transition.applied ? '' : ' (already closed, ignored)'}`,
     );
-    return { ok: true, outcome, applied };
+    return { ok: true, outcome, applied: transition.applied };
   }
 }

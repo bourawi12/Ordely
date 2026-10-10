@@ -38,6 +38,8 @@ export class DashboardService {
       recentCalls,
       pendingOrders,
       pendingCount,
+      retryableCount,
+      reviewCount,
     ] = await Promise.all([
       this.metric(
         (createdAt) =>
@@ -105,6 +107,21 @@ export class DashboardService {
         },
       }),
       this.prisma.order.count({ where: { boutiqueId, status: 'pending' } }),
+      this.prisma.call.count({
+        where: {
+          status: { in: ['failed', 'no_answer'] },
+          order: {
+            boutiqueId,
+            status: { in: ['pending', 'unreachable'] },
+          },
+        },
+      }),
+      this.prisma.call.count({
+        where: {
+          disposition: 'needs_human',
+          order: { boutiqueId, status: 'unreachable' },
+        },
+      }),
     ]);
 
     return {
@@ -122,6 +139,10 @@ export class DashboardService {
         callQueued: calls.length > 0,
       })),
       pendingCount,
+      actionCounts: {
+        retryable: retryableCount,
+        needsReview: reviewCount,
+      },
     };
   }
 

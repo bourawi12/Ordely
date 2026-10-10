@@ -3,7 +3,8 @@ const { VoiceCallAgent } = require('./voiceCallAgent');
 describe('VoiceCallAgent decision reporting', () => {
   function createAgent() {
     const order: string[] = [];
-    const gemini = { acknowledgeTool: jest.fn() };
+    const timers: Array<{ callback: () => unknown; delay: number; cancelled: boolean }> = [];
+    const gemini = { acknowledgeTool: jest.fn(), speak: jest.fn() };
     const bridge = {
       flushOutput: jest.fn(() => order.push('flush')),
       waitForOutputDrain: jest.fn(async () => order.push('drained')),
@@ -15,13 +16,19 @@ describe('VoiceCallAgent decision reporting', () => {
       wrtc: {},
       geminiFactory: async () => gemini,
       artifactStore: {},
-      artifactClient: {},
+      artifactClient: { appendTranscript: jest.fn().mockResolvedValue(undefined) },
       logger: { info() {}, warn() {}, error() {} },
+      scheduleTimer: (callback: () => unknown, delay: number) => {
+        const timer = { callback, delay, cancelled: false };
+        timers.push(timer);
+        return timer;
+      },
+      cancelTimer: (timer: { cancelled: boolean }) => { timer.cancelled = true; },
     });
     agent.gemini = gemini;
     agent.bridge = bridge;
     agent.stop = jest.fn(async () => order.push('hangup'));
-    return { agent, bridge, gemini, order };
+    return { agent, bridge, gemini, order, timers };
   }
 
   it('waits for Maria to signal end_call after reporting the decision', async () => {
@@ -54,5 +61,43 @@ describe('VoiceCallAgent decision reporting', () => {
     });
 
     expect(agent.decision).toEqual({ intent: 'UNCLEAR', confidence: 0, language: undefined });
+  });
+
+  it('acknowledges silence with a Tunisian Derja prompt and resets the watchdog', async () => {
+    const { agent, gemini, timers } = createAgent();
+    agent.greetingComplete = true;
+
+    agent.resetCustomerSilenceTimer();
+    expect(timers[0].delay).toBe(12000);
+    await timers[0].callback();
+
+    expect(gemini.speak).toHaveBeenCalledWith('اسأل الحريف بلطف: ألو، تسمع فيّا؟');
+    expect(timers).toHaveLength(2);
+  });
+
+  it('resets customer silence after mobile speech and clears it after a decision', () => {
+    const { agent, timers } = createAgent();
+    agent.greetingComplete = true;
+
+    agent.resetCustomerSilenceTimer();
+    const firstTimer = timers[0];
+    agent.handleGeminiEvent({ type: 'transcript', speaker: 'mobile', text: 'نعم' });
+
+    expect(firstTimer.cancelled).toBe(true);
+    expect(timers).toHaveLength(2);
+    agent.recordDecision({ id: 'tool-1', name: 'report_decision', args: { intent: 'CONFIRMED', confidence: 1 } });
+    expect(timers[1].cancelled).toBe(true);
+  });
+
+  it('forces an UNCLEAR decision and cleanup at the maximum call duration', async () => {
+    const { agent, timers } = createAgent();
+    agent.finish = jest.fn().mockResolvedValue(undefined);
+    agent.startCallDurationTimer();
+
+    expect(timers[0].delay).toBe(240000);
+    await timers[0].callback();
+
+    expect(agent.decision).toEqual({ intent: 'UNCLEAR', confidence: 0, language: undefined });
+    expect(agent.finish).toHaveBeenCalledWith('Maximum call duration reached.', 'timeout');
   });
 });

@@ -107,53 +107,38 @@ export default async function OrderPage({
 
         <section className={`${ui.card} ${ui.cardPad}`}>
           <div className={ui.cardHead}>
-            <h2 className={ui.cardTitle}>Confirmation calls</h2>
+            <h2 className={ui.cardTitle}>Activity timeline</h2>
           </div>
           {order.calls.length === 0 ? (
-            <p className={ui.muted}>No calls yet for this order.</p>
+            <p className={ui.muted}>Order created. No confirmation call has been queued yet.</p>
           ) : (
-            <div className={ui.tableWrap}>
-              <table className={ui.table}>
-                <thead>
-                  <tr>
-                    <th>Attempt</th>
-                    <th>Time</th>
-                    <th>Started</th>
-                    <th>Status</th>
-                    <th>Outcome</th>
-                    <th>Duration</th>
-                    <th>Language</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {order.calls.map((call) => (
-                    <tr key={call.id}>
-                      <td>
-                        <Link
-                          href={`/call-logs?range=all&search=${order.id}&call=${call.id}`}
-                        >
-                          #{call.attempt}
-                        </Link>
-                      </td>
-                      <td className={ui.muted}>
-                        {formatDateTime(call.createdAt)}
-                      </td>
-                      <td className={ui.muted}>
-                        {call.dispatchedAt ? formatDateTime(call.dispatchedAt) : "—"}
-                      </td>
-                      <td>
-                        <StatusBadge status={call.status} />
-                      </td>
-                      <td className={ui.muted}>{call.disposition?.replaceAll("_", " ") ?? "—"}</td>
-                      <td className={ui.muted}>
-                        {formatDuration(call.durationSeconds)}
-                      </td>
-                      <td className={ui.muted}>{call.language ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ol className={styles.timeline}>
+              <li className={styles.timelineItem}>
+                <span className={styles.timelineDot} aria-hidden="true" />
+                <div>
+                  <strong>Order created</strong>
+                  <p>{formatDateTime(order.createdAt)}</p>
+                </div>
+              </li>
+              {order.calls.map((call) => (
+                <li key={call.id} className={styles.timelineItem}>
+                  <span className={styles.timelineDot} aria-hidden="true" />
+                  <div className={styles.timelineContent}>
+                    <div className={styles.timelineHead}>
+                      <Link href={`/call-logs?range=all&search=${order.id}&call=${call.id}`}>
+                        <strong>Confirmation attempt {call.attempt}</strong>
+                      </Link>
+                      <StatusBadge status={call.status} />
+                    </div>
+                    <p>{formatDateTime(call.createdAt)} · {call.dispatchedAt ? `started ${formatDateTime(call.dispatchedAt)}` : "not started"}</p>
+                    <span className={ui.muted}>
+                      {call.disposition?.replaceAll("_", " ") ?? "No outcome yet"} · {formatDuration(call.durationSeconds)} · {call.language ?? "language not set"}
+                    </span>
+                    {call.failureReason && <span className={styles.timelineReason}>{call.failureReason}</span>}
+                  </div>
+                </li>
+              ))}
+            </ol>
           )}
         </section>
       </div>

@@ -133,6 +133,10 @@ export interface DashboardSummary {
   recentCalls: (Call & { order: Pick<Order, "id" | "customer"> })[];
   pendingOrders: (Order & { callQueued: boolean })[];
   pendingCount: number;
+  actionCounts: {
+    retryable: number;
+    needsReview: number;
+  };
 }
 
 export type AnalyticsRange = "7d" | "30d" | "90d";
