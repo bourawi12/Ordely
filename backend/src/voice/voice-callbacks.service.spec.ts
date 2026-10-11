@@ -2,7 +2,6 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { StorageService } from '../storage/storage.service';
-import { IntegrationWebhookService } from '../integrations/integration-webhook.service';
 import { VoiceCallbacksService } from './voice-callbacks.service';
 
 const call = {
@@ -43,7 +42,6 @@ describe('VoiceCallbacksService realtime publishing', () => {
       {} as StorageService,
       { get: jest.fn((_key, fallback) => fallback) } as unknown as ConfigService,
       realtime as unknown as RealtimeService,
-      { notifyOrderStatus: jest.fn() } as unknown as IntegrationWebhookService,
     );
   });
 

@@ -1,7 +1,11 @@
-import { api } from "@/lib/api";
-import IntegrationSetup from "./IntegrationSetup";
+import ComingSoon from "@/components/app/ComingSoon";
 
-export default async function IntegrationsPage() {
-  const integration = await api.getIntegration();
-  return <IntegrationSetup initialIntegration={integration} />;
+export default function IntegrationsPage() {
+  return (
+    <ComingSoon
+      icon="plug"
+      title="Integrations are coming soon"
+      text="Connect your online store so new orders arrive in Ordely automatically. Until then, orders can be added from the Orders page or the API."
+    />
+  );
 }

@@ -3,7 +3,6 @@ import { Test } from '@nestjs/testing';
 import { CallOrchestratorService } from '../calls/orchestration/call-orchestrator.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
-import { IntegrationWebhookService } from '../integrations/integration-webhook.service';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
@@ -25,7 +24,6 @@ describe('OrdersService', () => {
       providers: [
         OrdersService,
         { provide: CallOrchestratorService, useValue: callOrchestrator },
-        { provide: IntegrationWebhookService, useValue: { notifyOrderStatus: jest.fn() } },
         {
           provide: PrismaService,
           useValue: {
