@@ -44,6 +44,7 @@ export async function createOrder(
     await api.createOrder({
       customer: String(formData.get("customer") ?? ""),
       phone: String(formData.get("phone") ?? ""),
+      address: String(formData.get("address") ?? ""),
       items,
       total,
     });
@@ -70,6 +71,7 @@ export async function editOrder(
     await api.updateOrder(id, {
       customer: String(formData.get("customer") ?? ""),
       phone: String(formData.get("phone") ?? ""),
+      address: String(formData.get("address") ?? ""),
       total: totalRaw ? Number(totalRaw) : undefined,
     });
   } catch (err) {

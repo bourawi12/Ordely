@@ -25,6 +25,7 @@ describe('VoiceDispatcherService', () => {
       id: 70,
       customer: 'Ines',
       phone: '+216 22 111 222',
+      address: '12 Rue de la Paix, Tunis',
       total: new Prisma.Decimal(240),
       items: [
         {
@@ -74,6 +75,7 @@ describe('VoiceDispatcherService', () => {
       order: {
         id: 70,
         customerName: 'Ines',
+        address: '12 Rue de la Paix, Tunis',
         items: [{ name: 'Montre', quantity: 2, unitPrice: '120' }],
         total: '240',
       },

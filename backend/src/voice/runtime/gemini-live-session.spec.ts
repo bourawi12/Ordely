@@ -22,6 +22,10 @@ describe('GeminiLiveSession decision reporting', () => {
       'end_call',
     ]);
     expect(instruction).toContain('one or two brief, natural clarifying questions');
+    expect(instruction).toContain('unit price of each item');
+    expect(instruction).toContain('do not send them to the boutique');
+    expect(instruction).toContain('provide a complete delivery address');
+    expect(instruction).toContain('Do not report CONFIRMED while the address is missing');
     expect(instruction).toContain('say plainly that the order is confirmed or cancelled');
     expect(instruction).toContain('call report_decision exactly once');
     expect(instruction).toContain('then call end_call exactly once');

@@ -1,13 +1,19 @@
 import {
   BadRequestException,
   Injectable,
+  Inject,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Order } from '@prisma/client';
 import { CallOrchestratorService } from '../calls/orchestration/call-orchestrator.service';
 import { nextAttemptAt } from '../calls/orchestration/call-orchestration-policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import {
+  ORDER_STATUS_UPDATE_PUBLISHER,
+  OrderStatusUpdatePublisher,
+} from './order-status-update.publisher';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus, UpdateOrderDto } from './dto/update-order.dto';
 
@@ -46,6 +52,9 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly realtimeService: RealtimeService,
     private readonly callOrchestrator: CallOrchestratorService,
+    @Optional()
+    @Inject(ORDER_STATUS_UPDATE_PUBLISHER)
+    private readonly statusPublisher?: OrderStatusUpdatePublisher,
   ) {}
 
   async findAll(boutiqueId: number, status?: OrderStatus) {
@@ -102,7 +111,10 @@ export class OrdersService {
       data: {
         customer: dto.customer,
         phone: dto.phone,
+        address: dto.address,
         total: computedTotal,
+        source: dto.source,
+        externalOrderId: dto.externalOrderId,
         boutiqueId,
         items: {
           create: dto.items.map((i) => ({
@@ -130,7 +142,11 @@ export class OrdersService {
     id: number,
     dto: UpdateOrderDto,
   ): Promise<Order> {
-    await this.ensureExists(boutiqueId, id);
+    const existing = await this.prisma.order.findFirst({
+      where: { id, boutiqueId },
+      select: { status: true },
+    });
+    if (!existing) throw new NotFoundException(`Order ${id} not found`);
     const updated = await this.prisma.order.update({
       where: { id },
       data: dto,
@@ -142,6 +158,16 @@ export class OrdersService {
         status: updated.status,
         updatedAt: new Date().toISOString(),
       });
+      if (
+        existing.status !== updated.status &&
+        (updated.status === 'confirmed' || updated.status === 'cancelled')
+      ) {
+        void this.statusPublisher?.publish({
+          boutiqueId,
+          orderId: updated.id,
+          status: updated.status,
+        });
+      }
     }
     return updated;
   }

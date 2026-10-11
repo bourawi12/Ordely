@@ -9,20 +9,24 @@ datasource db {
 
 /// Order status: "pending" (awaiting confirmation), "confirmed", "cancelled" or "unreachable".
 model Order {
-  id         Int         @id @default(autoincrement())
+  id              Int           @id @default(autoincrement())
   /// The shop the order belongs to: every read and write is scoped by it.
-  boutiqueId Int
-  boutique   Boutique    @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
-  customer   String      @db.VarChar
-  phone      String      @default("") @db.VarChar(30)
+  boutiqueId      Int
+  boutique        Boutique      @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  customer        String        @db.VarChar
+  phone           String        @default("") @db.VarChar(30)
+  address         String?       @db.VarChar(500)
   /// Order value in TND (3 decimals for millimes).
-  total      Decimal     @default(0) @db.Decimal(10, 3)
-  status     String      @default("pending") @db.VarChar(20)
-  createdAt  DateTime    @default(now()) @db.Timestamptz(6)
-  items      OrderItem[]
-  calls      Call[]
-  reclamations Reclamation[]
+  total           Decimal       @default(0) @db.Decimal(10, 3)
+  status          String        @default("pending") @db.VarChar(20)
+  source          String?       @db.VarChar(30)
+  externalOrderId String?       @db.VarChar(120)
+  createdAt       DateTime      @default(now()) @db.Timestamptz(6)
+  items           OrderItem[]
+  calls           Call[]
+  reclamations    Reclamation[]
 
+  @@unique([boutiqueId, externalOrderId])
   @@index([boutiqueId, status])
   @@index([boutiqueId, createdAt])
   @@index([status])
@@ -44,53 +48,36 @@ model OrderItem {
 }
 
 /// One confirmation call attempt for an order.
-/// Status: "pending" (queued), "confirmed", "failed" or "no_answer".
 model Call {
-  id              Int       @id @default(autoincrement())
-  orderId         Int
-  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  status          String    @default("pending") @db.VarChar(20)
-  attempt         Int       @default(1)
-  durationSeconds Int?
-  language        String?   @db.VarChar(30)
-  /// [{ "speaker": "agent" | "customer", "text": string }]
-  transcript      Json?
-  recordingUrl    String?
-  // Voice agent (Ringio). Nothing here is set for calls made another way.
-  /// When the call was handed to the voice agent; null while still queued in Ordely.
-  dispatchedAt    DateTime? @db.Timestamptz(6)
-  /// The voice provider's own call id, for support and debugging.
-  providerCallId  String?   @db.VarChar(100)
-  /// Raw transcript fragments as streamed by the agent: [{ seq, speaker, text }].
-  /// `transcript` holds the readable version (consecutive fragments merged).
-  transcriptParts Json?
-  /// Private object-storage keys of the call audio: { agent?: key, customer?: key }.
-  recordingKeys   Json?
-  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
-
-  /// UUID task ID for voice-agent correlation
-  taskId          String?   @unique @db.VarChar(36)
-  /// Provider's call ID (Ringio UUID), stored as correlation data
-  /// Transport phase: dispatched, ringing, connected, ended, error, etc.
-  transportPhase  String?   @db.VarChar(20)
-  /// Business disposition from the agent: confirmed, declined, etc.
-  disposition     String?   @db.VarChar(20)
-  /// Human-readable failure reason shown in the dashboard
-  failureReason   String?   @db.VarChar(500)
-  /// When the provider reported the call ended
-  completedAt     DateTime? @db.Timestamptz(6)
-  /// Marks this as a simulated test call
-  isSimulated     Boolean   @default(true)
-
+  id                Int                   @id @default(autoincrement())
+  orderId           Int
+  order             Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status            String                @default("pending") @db.VarChar(20)
+  attempt           Int                   @default(1)
+  durationSeconds   Int?
+  language          String?               @db.VarChar(30)
+  transcript        Json?
+  recordingUrl      String?
+  dispatchedAt      DateTime?             @db.Timestamptz(6)
+  providerCallId    String?               @db.VarChar(100)
+  transcriptParts   Json?
+  recordingKeys     Json?
+  createdAt         DateTime              @default(now()) @db.Timestamptz(6)
+  taskId            String?               @unique @db.VarChar(36)
+  transportPhase    String?               @db.VarChar(20)
+  disposition       String?               @db.VarChar(20)
+  failureReason     String?               @db.VarChar(500)
+  completedAt       DateTime?             @db.Timestamptz(6)
+  isSimulated       Boolean               @default(true)
   recordings        CallRecording[]
   transcriptEntries CallTranscriptEntry[]
 
+  @@unique([orderId, attempt])
   @@index([orderId])
   @@index([status, dispatchedAt])
   @@index([status])
   @@index([createdAt])
   @@index([taskId])
-  @@unique([orderId, attempt])
   @@map("calls")
 }
 
@@ -124,38 +111,37 @@ model CallTranscriptEntry {
   @@map("call_transcript_entries")
 }
 
-
 model User {
-  id                     Int       @id @default(autoincrement())
-  email                  String    @unique
+  id                     Int           @id @default(autoincrement())
+  email                  String        @unique
   name                   String
   passwordHash           String
   boutiqueId             Int
-  boutique               Boutique  @relation(fields: [boutiqueId], references: [id])
+  boutique               Boutique      @relation(fields: [boutiqueId], references: [id])
   /// Object key of the profile picture in the S3 bucket (never a URL: URLs are signed on read).
-  avatarKey              String?   @db.VarChar(255)
+  avatarKey              String?       @db.VarChar(255)
   /// Accent colour of the app, "#RRGGBB"; null = the Ordely blue.
-  accentColor            String?   @db.VarChar(7)
+  accentColor            String?       @db.VarChar(7)
   /// "system" (follow the device), "light" or "dark".
-  themeMode              String    @default("system") @db.VarChar(10)
+  themeMode              String        @default("system") @db.VarChar(10)
   /// Set once the address is confirmed through the emailed link; the app stays closed until then.
-  emailVerifiedAt        DateTime? @db.Timestamptz(6)
+  emailVerifiedAt        DateTime?     @db.Timestamptz(6)
   /// SHA-256 of the pending link's token (the token itself is only in the email).
-  emailVerifyTokenHash   String?   @unique @db.VarChar(64)
-  emailVerifyExpiresAt   DateTime? @db.Timestamptz(6)
+  emailVerifyTokenHash   String?       @unique @db.VarChar(64)
+  emailVerifyExpiresAt   DateTime?     @db.Timestamptz(6)
   /// When the last link was sent, for the resend cooldown.
-  emailVerifySentAt      DateTime? @db.Timestamptz(6)
+  emailVerifySentAt      DateTime?     @db.Timestamptz(6)
   /// SHA-256 of the pending "forgot password" link's token (the token itself is only in the email).
-  passwordResetTokenHash String?   @unique @db.VarChar(64)
-  passwordResetExpiresAt DateTime? @db.Timestamptz(6)
+  passwordResetTokenHash String?       @unique @db.VarChar(64)
+  passwordResetExpiresAt DateTime?     @db.Timestamptz(6)
   /// When the last reset link was sent, for the cooldown.
-  passwordResetSentAt    DateTime? @db.Timestamptz(6)
+  passwordResetSentAt    DateTime?     @db.Timestamptz(6)
   /// Set by a password reset: sessions issued before it stop working.
-  passwordChangedAt      DateTime? @db.Timestamptz(6)
+  passwordChangedAt      DateTime?     @db.Timestamptz(6)
   /// Ordely team member: opens the internal back office (/admin). Never set through the API;
   /// granted by ADMIN_EMAIL at startup (src/admin/admin-bootstrap.service.ts) or in the database.
-  isPlatformAdmin        Boolean   @default(false)
-  createdAt              DateTime  @default(now()) @db.Timestamptz(6)
+  isPlatformAdmin        Boolean       @default(false)
+  createdAt              DateTime      @default(now()) @db.Timestamptz(6)
   reclamations           Reclamation[]
 
   @@index([boutiqueId])
@@ -165,41 +151,59 @@ model User {
 /// The merchant's shop. Created empty at registration and filled by the onboarding.
 /// Allowed values for the list fields live in backend/src/boutique/boutique-options.ts.
 model Boutique {
-  id                    Int       @id @default(autoincrement())
+  id                    Int           @id @default(autoincrement())
   // Screen 1 (required) — identity
-  name                  String?   @db.VarChar(100)
-  businessPhone         String?   @db.VarChar(30)
-  platform              String?   @db.VarChar(30)
+  name                  String?       @db.VarChar(100)
+  businessPhone         String?       @db.VarChar(30)
+  platform              String?       @db.VarChar(30)
   // Screen 2 (required) — agent
-  callLanguages         String[]  @default([])
+  callLanguages         String[]      @default([])
   /// "HH:MM", Africa/Tunis.
-  callStartTime         String?   @db.VarChar(5)
-  callEndTime           String?   @db.VarChar(5)
-  confirmationProcess   String?   @db.VarChar(30)
+  callStartTime         String?       @db.VarChar(5)
+  callEndTime           String?       @db.VarChar(5)
+  confirmationProcess   String?       @db.VarChar(30)
   // Screen 3 (optional) — business details
-  sector                String?   @db.VarChar(30)
+  sector                String?       @db.VarChar(30)
   /// Gouvernorat codes, or ["all"] for the whole country.
-  deliveryZones         String[]  @default([])
-  dailyOrderVolume      String?   @db.VarChar(20)
-  acquisitionSource     String?   @db.VarChar(30)
-  carrier               String?   @db.VarChar(30)
-  onboardingCompletedAt DateTime? @db.Timestamptz(6)
+  deliveryZones         String[]      @default([])
+  dailyOrderVolume      String?       @db.VarChar(20)
+  acquisitionSource     String?       @db.VarChar(30)
+  carrier               String?       @db.VarChar(30)
+  onboardingCompletedAt DateTime?     @db.Timestamptz(6)
   // Billing (back office). Codes and prices live in backend/src/admin/plans.ts.
   /// Paid plan code ("starter", "growth", "pro"); null = the free plan.
-  plan                  String?   @db.VarChar(20)
+  plan                  String?       @db.VarChar(20)
   /// When the paid plan started (first upgrade or last change).
-  planStartedAt         DateTime? @db.Timestamptz(6)
+  planStartedAt         DateTime?     @db.Timestamptz(6)
   /// When the paid subscription was cancelled: the shop is back on the free plan from then on.
-  churnedAt             DateTime? @db.Timestamptz(6)
-  createdAt             DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  churnedAt             DateTime?     @db.Timestamptz(6)
+  createdAt             DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime      @default(now()) @updatedAt @db.Timestamptz(6)
   users                 User[]
   orders                Order[]
+  integration           Integration?
   payments              Payment[]
   reclamations          Reclamation[]
 
   @@index([createdAt])
   @@map("boutiques")
+}
+
+model Integration {
+  id            Int       @id @default(autoincrement())
+  boutiqueId    Int       @unique
+  boutique      Boutique  @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  name          String    @default("Custom website") @db.VarChar(100)
+  apiKeyHash    String    @unique @db.VarChar(64)
+  apiKeyPrefix  String    @db.VarChar(20)
+  webhookUrl    String?   @db.VarChar(500)
+  webhookSecret String    @db.VarChar(100)
+  enabled       Boolean   @default(true)
+  lastTestedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("integrations")
 }
 
 /// A support issue submitted by a merchant account.

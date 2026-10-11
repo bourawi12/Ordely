@@ -20,6 +20,7 @@ export interface Order {
   id: number;
   customer: string;
   phone: string;
+  address: string | null;
   /** TND, serialized as a decimal string. */
   total: string;
   status: OrderStatus;
@@ -335,6 +336,18 @@ export interface ImportResult {
   errors: { row: number; message: string }[];
 }
 
+export interface IntegrationConnection {
+  id: number;
+  provider: string;
+  name: string;
+  apiKeyPrefix: string;
+  webhookUrl: string | null;
+  enabled: boolean;
+  status: "active" | "disabled";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const api = {
   health: () => request<Health>("/health", undefined, { auth: false }),
   login: (data: { email: string; password: string }) =>
@@ -404,6 +417,25 @@ changePassword: (data: {
   }),
 
 boutique: () => request<Boutique>("/boutique"),
+  listIntegrations: () => request<IntegrationConnection[]>("/integrations"),
+  createCustomApiIntegration: (name?: string) =>
+    request<IntegrationConnection & { apiKey: string; warning: string }>(
+      "/integrations/custom-api",
+      { method: "POST", body: JSON.stringify({ name }) },
+    ),
+  updateCustomApiIntegration: (data: { webhookUrl?: string; rotateWebhookSecret?: boolean }) =>
+    request<{
+      id: number;
+      name: string;
+      webhookUrl: string | null;
+      apiKeyPrefix: string;
+      enabled: boolean;
+      updatedAt: string;
+      webhookSecret?: string;
+    }>("/integrations/custom-api", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 
 updateBoutique: (
   section: BoutiqueSection,
@@ -453,6 +485,7 @@ completeOnboarding: () =>
   createOrder: (data: {
     customer: string;
     phone: string;
+    address?: string;
     items: { productName: string; quantity: number; unitPrice?: number }[];
     total?: number;
   }) =>
@@ -463,6 +496,7 @@ completeOnboarding: () =>
       status: OrderStatus;
       customer: string;
       phone: string;
+      address?: string;
       total: number;
     }>,
   ) =>

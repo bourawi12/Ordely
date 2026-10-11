@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "integrations" ALTER COLUMN "lastTestedAt" SET DATA TYPE TIMESTAMP(3),
+ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMP(3);

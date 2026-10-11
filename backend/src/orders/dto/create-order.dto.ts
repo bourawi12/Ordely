@@ -30,6 +30,12 @@ export class CreateOrderDto {
   })
   phone: string;
 
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(500)
+  address?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
@@ -42,4 +48,14 @@ export class CreateOrderDto {
   @Min(0)
   @Max(1_000_000)
   total?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  source?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  externalOrderId?: string;
 }

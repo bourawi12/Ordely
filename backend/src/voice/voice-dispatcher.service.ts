@@ -106,6 +106,7 @@ export class VoiceDispatcherService
         order: {
           id: order.id,
           customerName: order.customer,
+          address: order.address ?? null,
           items: order.items.map((i) => ({
             name: i.productName,
             quantity: i.quantity,

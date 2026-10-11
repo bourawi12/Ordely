@@ -49,6 +49,10 @@ export default function EditableOrder({ order, children }: { order: Order; child
         />
       </label>
       <label className={ui.field}>
+        Delivery address
+        <textarea className={ui.textarea} name="address" defaultValue={order.address ?? ""} maxLength={500} />
+      </label>
+      <label className={ui.field}>
         Total (TND)
         <input
           className={ui.input}

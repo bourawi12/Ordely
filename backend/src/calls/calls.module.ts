@@ -9,7 +9,11 @@ import { CallOrchestratorService } from './orchestration/call-orchestrator.servi
 @Module({
   imports: [RealtimeModule, VoiceModule],
   controllers: [CallsController],
-  providers: [CallsService, CallDispatcherService, CallOrchestratorService],
+  providers: [
+    CallsService,
+    CallDispatcherService,
+    CallOrchestratorService,
+  ],
   exports: [CallsService, CallDispatcherService, CallOrchestratorService],
 })
 export class CallsModule {}

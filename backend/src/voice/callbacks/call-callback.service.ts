@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { VoiceCallEvent, VoiceCallResult } from '../voice.types';
@@ -9,6 +9,10 @@ import {
   LanguageCode,
 } from '../voice.rules';
 import { MAX_ATTEMPTS } from '../../calls/orchestration/call-orchestration-policy';
+import {
+  ORDER_STATUS_UPDATE_PUBLISHER,
+  OrderStatusUpdatePublisher,
+} from '../../orders/order-status-update.publisher';
 
 const DEFAULT_MIN_CONFIDENCE = 0.7;
 
@@ -19,6 +23,9 @@ export class CallCallbackService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    @Optional()
+    @Inject(ORDER_STATUS_UPDATE_PUBLISHER)
+    private readonly statusPublisher?: OrderStatusUpdatePublisher,
   ) {}
 
   private get minConfidence() {
@@ -101,6 +108,7 @@ export class CallCallbackService {
       failureReason = 'Customer intent unclear; another call will be attempted';
     }
 
+    let orderStatus: 'confirmed' | 'cancelled' | null = null;
     const applied = await this.prisma.$transaction(async (tx) => {
       const update = await tx.call.updateMany({
         where: { id: call.id, status: 'pending' },
@@ -132,15 +140,31 @@ export class CallCallbackService {
             where: { id: call.id },
             data: { status, disposition, failureReason },
           });
+        } else {
+          orderStatus = outcome;
         }
       } else if (call.attempt >= MAX_ATTEMPTS) {
-        await tx.order.updateMany({
+        const orderUpdate = await tx.order.updateMany({
           where: { id: call.orderId, status: 'pending' },
           data: { status: 'unreachable' },
         });
       }
       return true;
     });
+
+    if (applied && orderStatus && this.statusPublisher) {
+      const order = await this.prisma.order.findUnique({
+        where: { id: call.orderId },
+        select: { boutiqueId: true },
+      });
+      if (order) {
+        void this.statusPublisher.publish({
+          boutiqueId: order.boutiqueId,
+          orderId: call.orderId,
+          status: orderStatus,
+        });
+      }
+    }
 
     this.logger.log(
       `Call ${call.id} finished with disposition ${disposition} (status: ${status})${applied ? '' : ' (already closed, ignored)'}`,

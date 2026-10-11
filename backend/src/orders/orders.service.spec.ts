@@ -3,12 +3,14 @@ import { Test } from '@nestjs/testing';
 import { CallOrchestratorService } from '../calls/orchestration/call-orchestrator.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { ORDER_STATUS_UPDATE_PUBLISHER } from './order-status-update.publisher';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
   const prismaTransaction = jest.fn();
   const callOrchestrator = { pollOnce: jest.fn() };
+  const statusPublisher = { publish: jest.fn() };
   const order = {
     findMany: jest.fn(),
     findFirst: jest.fn(),
@@ -24,6 +26,7 @@ describe('OrdersService', () => {
       providers: [
         OrdersService,
         { provide: CallOrchestratorService, useValue: callOrchestrator },
+        { provide: ORDER_STATUS_UPDATE_PUBLISHER, useValue: statusPublisher },
         {
           provide: PrismaService,
           useValue: {
@@ -130,19 +133,39 @@ describe('OrdersService', () => {
   });
 
   it('edits the fields of an order of the shop', async () => {
-    order.count.mockResolvedValue(1);
+    order.findFirst.mockResolvedValue({ status: 'pending' });
     order.update.mockResolvedValue({ id: 1, customer: 'Bob' });
     await expect(
       service.update(7, 1, { customer: 'Bob' }),
     ).resolves.toMatchObject({ customer: 'Bob' });
-    expect(order.count).toHaveBeenCalledWith({
+    expect(order.findFirst).toHaveBeenCalledWith({
       where: { id: 1, boutiqueId: 7 },
+      select: { status: true },
     });
     expect(order.update).toHaveBeenCalledWith({
       where: { id: 1 },
       data: { customer: 'Bob' },
       include: { items: true },
     });
+  });
+
+  it('publishes only a changed confirmed or cancelled order status', async () => {
+    order.findFirst.mockResolvedValue({ status: 'pending' });
+    order.update.mockResolvedValue({ id: 5, status: 'confirmed' });
+
+    await service.update(7, 5, { status: 'confirmed' });
+
+    expect(statusPublisher.publish).toHaveBeenCalledWith({
+      boutiqueId: 7,
+      orderId: 5,
+      status: 'confirmed',
+    });
+
+    statusPublisher.publish.mockClear();
+    order.findFirst.mockResolvedValue({ status: 'confirmed' });
+    order.update.mockResolvedValue({ id: 5, status: 'confirmed' });
+    await service.update(7, 5, { status: 'confirmed' });
+    expect(statusPublisher.publish).not.toHaveBeenCalled();
   });
 
   it("throws NotFound for missing orders and another shop's orders", async () => {

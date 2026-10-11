@@ -160,7 +160,7 @@ export class CallOrchestratorService implements OnModuleInit, OnModuleDestroy {
         },
       });
       if (result.count > 0 && call.attempt >= 3) {
-        await this.prisma.order.updateMany({
+        const updated = await this.prisma.order.updateMany({
           where: { id: call.orderId, status: 'pending' },
           data: { status: 'unreachable' },
         });

@@ -53,6 +53,8 @@ export default async function OrderPage({
               <dd>{order.customer}</dd>
               <dt>Phone</dt>
               <dd>{order.phone || "—"}</dd>
+              <dt>Address</dt>
+              <dd>{order.address || "—"}</dd>
               <dt>Items</dt>
               <dd>
                 {order.items && order.items.length > 0 ? (

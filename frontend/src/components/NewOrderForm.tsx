@@ -97,6 +97,10 @@ export default function NewOrderForm() {
                   pattern="\+?[0-9][0-9 ]{6,18}"
                 />
               </label>
+              <label className={ui.field}>
+                Delivery address
+                <textarea className={ui.textarea} name="address" maxLength={500} placeholder="Street, city, governorate" />
+              </label>
 
               <div style={{ marginTop: "0.5rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
