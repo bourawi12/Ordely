@@ -75,12 +75,12 @@ describe('VoiceDispatcherService', () => {
       order: {
         id: 70,
         customerName: 'Ines',
-        address: '12 Rue de la Paix, Tunis',
         items: [{ name: 'Montre', quantity: 2, unitPrice: '120' }],
         total: '240',
       },
       shop: { name: 'Chez Ada', languages: ['darija'] },
     });
+    expect(JSON.parse(init.body).order).not.toHaveProperty('address');
   });
 
   it('puts the call back in the queue when the agent is busy or unreachable', async () => {

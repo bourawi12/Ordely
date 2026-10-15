@@ -21,7 +21,6 @@ call_id,order,customer,phone,time,status,duration_seconds,attempt,language,amoun
 287,10740,Chaima Riahi,'+216 29 678 648,2026-09-25T17:08:00.000Z,confirmed,45,1,French,38
 286,10739,Ines Mansour,'+216 59 570 156,2026-09-25T16:08:00.000Z,confirmed,109,1,French,128
 284,10737,Emna Ferchichi,'+216 46 609 148,2026-09-25T11:28:00.000Z,confirmed,94,3,French,184
-285,10738,Chaima Slama,'+216 28 256 798,2026-09-25T11:16:00.000Z,pending,,1,,31
 283,10737,Emna Ferchichi,'+216 46 609 148,2026-09-25T10:28:00.000Z,no_answer,,2,,184
 282,10737,Emna Ferchichi,'+216 46 609 148,2026-09-25T09:28:00.000Z,no_answer,,1,,184
 281,10736,Leila Hadded,'+216 28 374 414,2026-09-25T08:22:00.000Z,confirmed,109,1,Arabic,145.5
@@ -43,10 +42,8 @@ call_id,order,customer,phone,time,status,duration_seconds,attempt,language,amoun
 265,10721,Hamza Boujemaa,'+216 26 937 551,2026-09-22T09:34:00.000Z,confirmed,95,1,French,144.5
 264,10720,Amine Jebali,'+216 57 325 746,2026-09-21T20:06:00.000Z,confirmed,108,1,English,36
 263,10719,Anis Boujemaa,'+216 94 656 688,2026-09-21T17:38:00.000Z,confirmed,101,1,Arabic,209
-262,10718,Bilel Kammoun,'+216 98 543 692,2026-09-21T17:26:00.000Z,pending,,1,,42
 261,10717,Omar Bouzid,'+216 97 420 459,2026-09-21T14:14:00.000Z,confirmed,121,1,Arabic,123
 260,10716,Aziz Jebali,'+216 54 471 597,2026-09-21T12:16:00.000Z,confirmed,122,1,Arabic,32.5
-258,10714,Sami Mejri,'+216 52 895 199,2026-09-21T11:38:00.000Z,pending,,3,,303
 257,10714,Sami Mejri,'+216 52 895 199,2026-09-21T09:38:00.000Z,no_answer,,2,,303
 259,10715,Anis Sassi,'+216 29 385 564,2026-09-21T08:58:00.000Z,confirmed,56,1,French,233
 256,10714,Sami Mejri,'+216 52 895 199,2026-09-21T08:38:00.000Z,no_answer,,1,,303
@@ -157,7 +154,6 @@ call_id,order,customer,phone,time,status,duration_seconds,attempt,language,amoun
 152,10617,Ahmed Jlassi,'+216 29 895 913,2026-09-03T15:50:00.000Z,confirmed,104,1,Arabic,338
 150,10616,Sami Boujemaa,'+216 40 238 645,2026-09-03T13:58:00.000Z,no_answer,,1,,49
 149,10615,Nour Zouari,'+216 42 119 386,2026-09-03T09:44:00.000Z,confirmed,48,2,French,55
-147,10614,Omar Ben Salem,'+216 25 898 983,2026-09-03T08:13:00.000Z,pending,,2,,54
 148,10615,Nour Zouari,'+216 42 119 386,2026-09-03T07:44:00.000Z,no_answer,,1,,55
 146,10614,Omar Ben Salem,'+216 25 898 983,2026-09-03T07:13:00.000Z,no_answer,,1,,54
 145,10613,Walid Ben Salem,'+216 51 184 928,2026-09-02T20:09:00.000Z,confirmed,47,1,Arabic,216
@@ -183,7 +179,6 @@ call_id,order,customer,phone,time,status,duration_seconds,attempt,language,amoun
 125,10595,Karim Gharbi,'+216 26 996 165,2026-08-30T13:10:00.000Z,confirmed,88,1,French,128
 124,10594,Nour Zouari,'+216 96 779 608,2026-08-30T12:42:00.000Z,confirmed,63,1,French,54.5
 123,10593,Leila Kammoun,'+216 94 781 631,2026-08-29T19:52:00.000Z,confirmed,122,1,French,51
-122,10592,Fatma Trabelsi,'+216 54 461 769,2026-08-29T17:28:00.000Z,pending,,1,,231
 121,10591,Hana Bouzid,'+216 21 436 441,2026-08-29T16:42:00.000Z,confirmed,103,1,Arabic,32
 120,10590,Yasmine Ferchichi,'+216 96 745 179,2026-08-29T15:04:00.000Z,confirmed,126,1,Arabic,27.5
 119,10589,Amine Sassi,'+216 21 479 694,2026-08-29T08:33:00.000Z,confirmed,120,1,Arabic,226
@@ -237,7 +232,6 @@ call_id,order,customer,phone,time,status,duration_seconds,attempt,language,amoun
 71,10547,Khalil Riahi,'+216 29 517 357,2026-08-18T15:24:00.000Z,confirmed,115,1,Arabic,84
 70,10546,Rim Kammoun,'+216 41 789 217,2026-08-17T18:58:00.000Z,failed,46,1,French,63
 69,10545,Karim Slama,'+216 90 819 195,2026-08-17T18:41:00.000Z,confirmed,75,1,Arabic,34
-68,10544,Sirine Mansour,'+216 99 400 536,2026-08-17T15:34:00.000Z,pending,,1,,27.5
 67,10543,Anis Ayedi,'+216 43 381 989,2026-08-17T12:09:00.000Z,failed,21,1,French,121.5
 66,10542,Mariem Trabelsi,'+216 99 654 237,2026-08-16T15:08:00.000Z,confirmed,68,1,Arabic,55
 65,10541,Nour Ben Salem,'+216 28 489 956,2026-08-16T11:53:00.000Z,confirmed,67,1,Arabic,273.5
@@ -269,7 +263,6 @@ call_id,order,customer,phone,time,status,duration_seconds,attempt,language,amoun
 39,10516,Hatem Ben Salem,'+216 97 574 847,2026-08-09T13:58:00.000Z,confirmed,83,1,Arabic,104
 38,10515,Asma Khelifi,'+216 59 571 421,2026-08-09T13:05:00.000Z,confirmed,111,1,French,199.5
 37,10514,Rim Kammoun,'+216 51 862 836,2026-08-08T12:29:00.000Z,confirmed,55,1,Arabic,326
-36,10513,Salma Khelifi,'+216 98 155 154,2026-08-08T11:55:00.000Z,pending,,1,,570
 35,10512,Sirine Jebali,'+216 49 328 542,2026-08-08T08:47:00.000Z,confirmed,78,1,Arabic,90.5
 34,10511,Sirine Riahi,'+216 94 109 183,2026-08-07T19:41:00.000Z,confirmed,114,1,Arabic,161
 33,10510,Amine Kammoun,'+216 22 437 709,2026-08-07T16:22:00.000Z,confirmed,106,1,Arabic,128

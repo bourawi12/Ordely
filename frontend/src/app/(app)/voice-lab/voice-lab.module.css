@@ -166,6 +166,68 @@
   gap: 0.75rem;
 }
 
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.itemRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.itemRow:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.itemRowHeader,
+.orderTotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.itemLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.itemRemove {
+  padding: 0.2rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: var(--negative);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.itemAdd {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.orderTotal {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .field {
   display: flex;
   flex-direction: column;

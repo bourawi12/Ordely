@@ -16,7 +16,7 @@ import {
   nextAttemptNumber,
 } from './call-orchestration-policy';
 
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_MS = 10_000;
 const POLL_BATCH_SIZE = 100;
 const STALE_CALL_TIMEOUT_MS = 10 * 60_000;
 
@@ -146,7 +146,7 @@ export class CallOrchestratorService implements OnModuleInit, OnModuleDestroy {
         status: 'pending',
         dispatchedAt: { lt: new Date(now.getTime() - STALE_CALL_TIMEOUT_MS) },
       },
-      select: { id: true, orderId: true, attempt: true },
+      select: { id: true, orderId: true, attempt: true, taskId: true },
     });
 
     for (const call of staleCalls) {
@@ -159,7 +159,17 @@ export class CallOrchestratorService implements OnModuleInit, OnModuleDestroy {
           failureReason: 'Voice call timed out without a result',
         },
       });
-      if (result.count > 0 && call.attempt >= 3) {
+      if (result.count === 0) continue;
+      if (call.taskId) {
+        try {
+          await this.voiceAgentClient.stopTask(call.taskId);
+        } catch (error) {
+          this.logger.warn(
+            `Could not stop stale voice task ${call.taskId}: ${(error as Error).message}`,
+          );
+        }
+      }
+      if (call.attempt >= 3) {
         const updated = await this.prisma.order.updateMany({
           where: { id: call.orderId, status: 'pending' },
           data: { status: 'unreachable' },

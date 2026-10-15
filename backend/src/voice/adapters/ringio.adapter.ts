@@ -18,12 +18,6 @@ export class RingioAdapter implements VoiceAgentClient, OnModuleDestroy {
 
   constructor(private readonly config: ConfigService) {}
 
-  private get callServerUrl(): string {
-    return (
-      this.config.get<string>('CALL_SERVER_URL') ?? 'http://127.0.0.1:4100'
-    ).replace(/\/$/, '');
-  }
-
   private get fallbackCallServerUrl(): string {
     return (
       this.config.get<string>('CALL_SERVER_FALLBACK_URL') ||
@@ -32,23 +26,14 @@ export class RingioAdapter implements VoiceAgentClient, OnModuleDestroy {
   }
 
   private async getAvailableCallServerUrl(): Promise<string | null> {
-    const urls = [...new Set([this.callServerUrl, this.fallbackCallServerUrl])];
-    for (const url of urls) {
-      try {
-        const response = await fetch(`${url}/health`, {
-          signal: AbortSignal.timeout(3000),
-        });
-        if (response.ok) {
-          if (url !== this.callServerUrl) {
-            this.logger.warn(
-              `Local Ringio server is unavailable; using fallback ${url}.`,
-            );
-          }
-          return url;
-        }
-      } catch {
-        // Try the next configured server.
-      }
+    const url = this.fallbackCallServerUrl;
+    try {
+      const response = await fetch(`${url}/health`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (response.ok) return url;
+    } catch {
+      // The mobile app is registered on this server; do not route to a different one.
     }
     return null;
   }
@@ -101,7 +86,7 @@ export class RingioAdapter implements VoiceAgentClient, OnModuleDestroy {
         return {
           accepted: false,
           deferred: true,
-          error: 'Local and fallback Ringio servers are unavailable.',
+          error: 'The configured Vercel Ringio server is unavailable.',
         };
       }
       if (!(await this.hasCapacity(callServerUrl))) {

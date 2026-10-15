@@ -29,24 +29,33 @@ export async function queueCallForOrderAction(orderId: number): Promise<{ succes
 export async function createTestOrderAndQueueAction(data: {
   customer: string;
   phone: string;
-  item: string;
-  quantity: number;
-  total: number;
+  items: { productName: string; quantity: number; unitPrice: number }[];
   autoDispatch?: boolean;
 }): Promise<{ success: boolean; callId?: number; error?: string }> {
   try {
-    const quantity = data.quantity > 0 ? data.quantity : 1;
+    if (!Array.isArray(data.items) || data.items.length === 0 || data.items.some((item) =>
+      !item || typeof item.productName !== "string" || !item.productName.trim() ||
+      !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000 ||
+      !Number.isFinite(item.unitPrice) || item.unitPrice < 0,
+    )) {
+      return { success: false, error: "Add valid product names, quantities, and prices." };
+    }
+
+    const items = data.items.map((item) => ({
+      ...item,
+      productName: item.productName.trim(),
+      unitPrice: Math.round(item.unitPrice * 1000) / 1000,
+    }));
+    const total = items.reduce(
+      (sum, item) => sum + Math.round(item.unitPrice * 1000) * item.quantity,
+      0,
+    ) / 1000;
 
     const order = await api.createOrder({
       customer: data.customer.trim() || "Test Customer",
       phone: data.phone.trim() || "+216 99 123 456",
-      items: [
-        {
-          productName: data.item.trim() || "Pack Découverte Ordely",
-          quantity,
-        },
-      ],
-      total: data.total > 0 ? data.total : 49.9,
+      items,
+      total,
     });
 
     const call = await api.queueCall(order.id);

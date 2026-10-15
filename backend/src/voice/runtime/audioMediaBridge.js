@@ -1,7 +1,7 @@
 const { mixToMono, resamplePcm16 } = require('./audioPcm');
 
 class AudioMediaBridge {
-  constructor({ peerConnection, wrtc, callId, artifactStore, onMobileAudio, onError, onAudioMetrics, outputSampleRate = 48000, outputBufferMs = 150, metricsIntervalMs = 5000, now = () => performance.now(), scheduleTimer = setTimeout, cancelTimer = clearTimeout }) {
+  constructor({ peerConnection, wrtc, callId, artifactStore, onMobileAudio, onMonitorAudio, onError, onAudioMetrics, outputSampleRate = 48000, outputBufferMs = 150, metricsIntervalMs = 5000, now = () => performance.now(), scheduleTimer = setTimeout, cancelTimer = clearTimeout }) {
     if (!peerConnection || !wrtc?.nonstandard?.RTCAudioSource || !wrtc?.nonstandard?.RTCAudioSink) {
       throw new TypeError('A WebRTC peer and audio source/sink implementation are required.');
     }
@@ -9,6 +9,7 @@ class AudioMediaBridge {
     this.callId = callId;
     this.artifactStore = artifactStore;
     this.onMobileAudio = onMobileAudio;
+    this.onMonitorAudio = onMonitorAudio;
     this.onError = onError;
     this.onAudioMetrics = onAudioMetrics;
     this.outputSampleRate = outputSampleRate;
@@ -67,6 +68,7 @@ class AudioMediaBridge {
     const sourcePcm = Buffer.isBuffer(audioBuffer)
       ? bufferToSamples(audioBuffer)
       : new Int16Array(audioBuffer);
+    this.onMonitorAudio?.(new Int16Array(sourcePcm), sampleRate);
     this.audioMetrics.geminiChunks += 1;
     this.audioMetrics.geminiAudioMs += sourcePcm.length / sampleRate * 1000;
     const artifactPcm = resamplePcm16(sourcePcm, sampleRate, this.outputSampleRate);

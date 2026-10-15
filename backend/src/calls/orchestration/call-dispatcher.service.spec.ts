@@ -25,8 +25,12 @@ describe('CallDispatcherService', () => {
       boutiqueId: 1,
       customer: 'Sami Ben Ali',
       phone: '+216 20 123 456',
-      items: [{ productName: 'Robe d’été', quantity: 2 }],
-      total: new Decimal('120.500'),
+      address: '12 Rue de la Paix, Tunis',
+      items: [
+        { productName: 'Robe d’été', quantity: 2, unitPrice: new Decimal('60.250') },
+        { productName: 'Chaussures', quantity: 1, unitPrice: new Decimal('35.125') },
+      ],
+      total: new Decimal('155.625'),
       boutique: {
         id: 1,
         name: 'Demo Boutique',
@@ -71,9 +75,14 @@ describe('CallDispatcherService', () => {
     expect(task.orderlyCallId).toBe(101);
     expect(task.destination).toBe('+21620123456');
     expect(task.scenario.customer).toBe('Sami Ben Ali');
-    expect(task.scenario.item).toBe('Robe d’été x2');
-    expect(task.scenario.quantity).toBe(2);
-    expect(task.scenario.total).toBe('120.500 TND');
+    expect(task.scenario.item).toBe('Robe d’été x2, Chaussures x1');
+    expect(task.scenario.quantity).toBe(3);
+    expect(task.scenario.items).toEqual([
+      { name: 'Robe d’été', quantity: 2, unitPrice: '60.250' },
+      { name: 'Chaussures', quantity: 1, unitPrice: '35.125' },
+    ]);
+    expect(task.scenario).not.toHaveProperty('address');
+    expect(task.scenario.total).toBe('155.625 TND');
     expect(task.scenario.boutique).toMatchObject({
       id: 1,
       name: 'Demo Boutique',

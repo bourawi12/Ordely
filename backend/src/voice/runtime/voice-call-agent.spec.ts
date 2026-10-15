@@ -6,6 +6,7 @@ describe('VoiceCallAgent decision reporting', () => {
     const timers: Array<{ callback: () => unknown; delay: number; cancelled: boolean }> = [];
     const gemini = { acknowledgeTool: jest.fn(), speak: jest.fn() };
     const bridge = {
+      enqueueGeminiAudio: jest.fn(),
       flushOutput: jest.fn(() => order.push('flush')),
       waitForOutputDrain: jest.fn(async () => order.push('drained')),
     };
@@ -87,6 +88,51 @@ describe('VoiceCallAgent decision reporting', () => {
     expect(timers).toHaveLength(2);
     agent.recordDecision({ id: 'tool-1', name: 'report_decision', args: { intent: 'CONFIRMED', confidence: 1 } });
     expect(timers[1].cancelled).toBe(true);
+  });
+
+  it('does not trigger the silence prompt during agent speech', async () => {
+    const { agent, bridge, timers } = createAgent();
+    agent.greetingComplete = true;
+    agent.resetCustomerSilenceTimer();
+
+    await agent.handleGeminiEvent({ type: 'output-audio', audio: Buffer.alloc(2), mimeType: 'audio/pcm;rate=24000' });
+    expect(timers[0].cancelled).toBe(true);
+
+    await agent.handleGeminiEvent({ type: 'turn-complete' });
+    expect(bridge.enqueueGeminiAudio).toHaveBeenCalledTimes(1);
+    expect(timers).toHaveLength(2);
+    expect(timers[1].cancelled).toBe(false);
+  });
+
+  it('exposes only generated agent audio to the monitor callback', async () => {
+    let bridgeOptions: any;
+    const monitored = jest.fn();
+    class FakePeerConnection {
+      connectionState = 'new';
+      async createOffer() { return { type: 'offer', sdp: 'offer' }; }
+      async setLocalDescription() {}
+    }
+    const agent = new VoiceCallAgent({
+      serverUrl: 'http://127.0.0.1:9',
+      destinationNumber: '+15550001234',
+      ioClient: () => {},
+      wrtc: { RTCPeerConnection: FakePeerConnection },
+      geminiFactory: async () => ({}),
+      artifactStore: {},
+      artifactClient: {},
+      onMonitorAudio: monitored,
+      mediaBridgeFactory: (options: any) => {
+        bridgeOptions = options;
+        return {};
+      },
+      logger: { info() {}, warn() {}, error() {} },
+    });
+    agent.socket = { emit: jest.fn() } as any;
+
+    await agent.beginMedia();
+    bridgeOptions.onMonitorAudio(new Int16Array([101, 202]), 24000);
+
+    expect(monitored).toHaveBeenCalledWith(new Int16Array([101, 202]), 24000);
   });
 
   it('forces an UNCLEAR decision and cleanup at the maximum call duration', async () => {

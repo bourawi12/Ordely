@@ -172,7 +172,7 @@ describe('CallOrchestratorService', () => {
 
   it('closes stale calls and makes the next attempt eligible', async () => {
     prisma.call.findMany.mockResolvedValue([
-      { id: 100, orderId: 50, attempt: 1 },
+      { id: 100, orderId: 50, attempt: 1, taskId: 'stale-task' },
     ]);
     prisma.order.findMany.mockResolvedValue([
       {
@@ -200,6 +200,7 @@ describe('CallOrchestratorService', () => {
         disposition: 'no_answer',
       }),
     });
+    expect(voiceAgent.stopped).toContain('stale-task');
     expect(prisma.call.create).toHaveBeenCalledWith({
       data: { orderId: 50, attempt: 2 },
       select: { id: true },

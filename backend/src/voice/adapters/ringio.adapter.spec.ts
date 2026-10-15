@@ -86,7 +86,7 @@ describe('RingioAdapter', () => {
       [],
       expect.objectContaining({
         env: expect.objectContaining({
-          CALL_SERVER_URL: 'http://127.0.0.1:4100',
+          CALL_SERVER_URL: 'https://voip-ringio-prototype.vercel.app',
           SIMULATED_DESTINATION_NUMBER: sampleTask.destination,
           VOICE_TASK_ID: sampleTask.taskId,
           CALL_TASK: JSON.stringify(sampleTask),
@@ -99,34 +99,22 @@ describe('RingioAdapter', () => {
     );
   });
 
-  it('uses the Vercel server when the local Ringio server is unhealthy', async () => {
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce({ ok: false, status: 503 })
-      .mockResolvedValueOnce({ ok: true, status: 200 })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ canLaunchCall: true }),
-      });
+  it('always uses the Vercel server, even when local is healthy', async () => {
 
     const result = await adapter.startTask(sampleTask);
 
     expect(result).toEqual({ accepted: true });
     expect(global.fetch).toHaveBeenNthCalledWith(
       1,
-      'http://127.0.0.1:4100/health',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
-    expect(global.fetch).toHaveBeenNthCalledWith(
-      2,
       'https://voip-ringio-prototype.vercel.app/health',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(global.fetch).toHaveBeenNthCalledWith(
-      3,
+      2,
       'https://voip-ringio-prototype.vercel.app/api/capacity',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+    expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(fork).toHaveBeenCalledWith(
       expect.stringContaining('runtime'),
       [],
@@ -144,7 +132,7 @@ describe('RingioAdapter', () => {
     await expect(adapter.startTask(sampleTask)).resolves.toEqual({
       accepted: false,
       deferred: true,
-      error: 'Local and fallback Ringio servers are unavailable.',
+      error: 'The configured Vercel Ringio server is unavailable.',
     });
     expect(fork).not.toHaveBeenCalled();
   });
@@ -217,7 +205,7 @@ describe('RingioAdapter', () => {
     });
     expect(global.fetch).toHaveBeenNthCalledWith(
       3,
-      'http://127.0.0.1:4100/api/capacity',
+      'https://voip-ringio-prototype.vercel.app/api/capacity',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(fork).not.toHaveBeenCalled();
@@ -310,7 +298,7 @@ describe('RingioAdapter', () => {
     const healthy = await adapter.healthCheck();
     expect(healthy).toBe(true);
     expect(global.fetch).toHaveBeenCalledWith(
-      'http://127.0.0.1:4100/health',
+      'https://voip-ringio-prototype.vercel.app/health',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });

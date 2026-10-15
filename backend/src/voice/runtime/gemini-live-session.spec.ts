@@ -22,13 +22,15 @@ describe('GeminiLiveSession decision reporting', () => {
       'end_call',
     ]);
     expect(instruction).toContain('one or two brief, natural clarifying questions');
-    expect(instruction).toContain('unit price of each item');
+    expect(instruction).toContain("each item's unit price when present");
     expect(instruction).toContain('do not send them to the boutique');
-    expect(instruction).toContain('provide a complete delivery address');
-    expect(instruction).toContain('Do not report CONFIRMED while the address is missing');
+    expect(instruction).toContain('Do not request, repeat, store, or discuss the customer\'s delivery address');
+    expect(instruction).not.toContain('address verification becomes MANDATORY');
+    expect(instruction).toContain('Never read "x1", "x2", or "× 2" aloud');
+    expect(instruction).toContain('Say "two units", not "x two"');
     expect(instruction).toContain('say plainly that the order is confirmed or cancelled');
     expect(instruction).toContain('call report_decision exactly once');
-    expect(instruction).toContain('then call end_call exactly once');
+    expect(instruction).toContain('Then call end_call exactly once');
 
     live.acknowledgeTool('tool-1', 'report_decision');
     expect(session.sendToolResponse).toHaveBeenCalledWith({

@@ -16,6 +16,12 @@ interface VoiceLabClientProps {
   initialSelectedCall: CallDetail | null;
 }
 
+interface TestOrderItem {
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+}
+
 export default function VoiceLabClient({
   initialCalls,
   initialSelectedCall,
@@ -38,11 +44,11 @@ export default function VoiceLabClient({
   const [isPending, startTransition] = useTransition();
 
   // Test form state
-  const [customerName, setCustomerName] = useState("Amine Mansour");
+  const [customerName, setCustomerName] = useState("Aymen Hadriche");
   const [phone, setPhone] = useState("+216 98 123 456");
-  const [item, setItem] = useState("Montre Connectée Sport Pro");
-  const [quantity, setQuantity] = useState(1);
-  const [total, setTotal] = useState(129.9);
+  const [items, setItems] = useState<TestOrderItem[]>([
+    { productName: "Montre Connectée Sport Pro", quantity: 4, unitPrice: 90 },
+  ]);
   const [autoDispatch, setAutoDispatch] = useState(true);
 
   // Status message
@@ -128,9 +134,7 @@ export default function VoiceLabClient({
       const res = await createTestOrderAndQueueAction({
         customer: customerName,
         phone,
-        item,
-        quantity: Number(quantity),
-        total: Number(total),
+        items,
         autoDispatch,
       });
 
@@ -193,6 +197,11 @@ export default function VoiceLabClient({
       phase ?? "",
     );
   };
+
+  const total = items.reduce(
+    (sum, item) => sum + Math.round(item.unitPrice * 1000) * item.quantity,
+    0,
+  ) / 1000;
 
   return (
     <div className={styles.container}>
@@ -290,42 +299,81 @@ export default function VoiceLabClient({
                   />
                 </div>
 
-                <div className={styles.field}>
-                  <label htmlFor="vl-item">Product Item</label>
-                  <input
-                    id="vl-item"
-                    className={styles.input}
-                    value={item}
-                    onChange={(e) => setItem(e.target.value)}
-                    required
-                  />
+                <div className={styles.itemList}>
+                  {items.map((item, index) => (
+                    <div className={styles.itemRow} key={index}>
+                      <div className={styles.itemRowHeader}>
+                        <span className={styles.itemLabel}>Product {index + 1}</span>
+                        {items.length > 1 && (
+                          <button
+                            type="button"
+                            className={styles.itemRemove}
+                            onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
+                            aria-label={`Remove product ${index + 1}`}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className={styles.field}>
+                        <label htmlFor={`vl-item-${index}`}>Product name</label>
+                        <input
+                          id={`vl-item-${index}`}
+                          className={styles.input}
+                          value={item.productName}
+                          onChange={(e) => setItems((current) => current.map((row, i) =>
+                            i === index ? { ...row, productName: e.target.value } : row,
+                          ))}
+                          required
+                        />
+                      </div>
+                      <div className={styles.formRow}>
+                        <div className={styles.field}>
+                          <label htmlFor={`vl-qty-${index}`}>Quantity</label>
+                          <input
+                            id={`vl-qty-${index}`}
+                            type="number"
+                            min={1}
+                            max={1000}
+                            className={styles.input}
+                            value={item.quantity}
+                            onChange={(e) => setItems((current) => current.map((row, i) =>
+                              i === index ? { ...row, quantity: Math.max(1, parseInt(e.target.value, 10) || 1) } : row,
+                            ))}
+                            required
+                          />
+                        </div>
+                        <div className={styles.field}>
+                          <label htmlFor={`vl-price-${index}`}>Unit price (TND)</label>
+                          <input
+                            id={`vl-price-${index}`}
+                            type="number"
+                            min={0}
+                            step="0.001"
+                            className={styles.input}
+                            value={item.unitPrice}
+                            onChange={(e) => setItems((current) => current.map((row, i) =>
+                              i === index ? { ...row, unitPrice: Number(e.target.value) || 0 } : row,
+                            ))}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                <div className={styles.formRow}>
-                  <div className={styles.field}>
-                    <label htmlFor="vl-qty">Quantity</label>
-                    <input
-                      id="vl-qty"
-                      type="number"
-                      min={1}
-                      className={styles.input}
-                      value={quantity}
-                      onChange={(e) => setQuantity(Number(e.target.value))}
-                      required
-                    />
-                  </div>
-                  <div className={styles.field}>
-                    <label htmlFor="vl-total">Total (TND)</label>
-                    <input
-                      id="vl-total"
-                      type="number"
-                      step="0.001"
-                      className={styles.input}
-                      value={total}
-                      onChange={(e) => setTotal(Number(e.target.value))}
-                      required
-                    />
-                  </div>
+                <button
+                  type="button"
+                  className={styles.itemAdd}
+                  onClick={() => setItems((current) => [...current, { productName: "", quantity: 1, unitPrice: 0 }])}
+                >
+                  + Add product
+                </button>
+
+                <div className={styles.orderTotal}>
+                  <span>Order total</span>
+                  <span>{formatTND(total)}</span>
                 </div>
 
                 <label className={styles.checkboxLabel}>

@@ -45,7 +45,7 @@ export class CallDispatcherService {
             include: {
               boutique: true,
               items: {
-                select: { productName: true, quantity: true },
+                select: { productName: true, quantity: true, unitPrice: true },
               },
             },
           },
@@ -105,9 +105,15 @@ export class CallDispatcherService {
         scenario: {
           orderRef: `#${call.order.id}`,
           customer: call.order.customer,
+
           item: call.order.items
             .map(({ productName, quantity }) => `${productName} x${quantity}`)
             .join(', '),
+          items: call.order.items.map(({ productName, quantity, unitPrice }) => ({
+            name: productName,
+            quantity,
+            unitPrice: Number(unitPrice).toFixed(3),
+          })),
           quantity: call.order.items.reduce(
             (sum, item) => sum + item.quantity,
             0,

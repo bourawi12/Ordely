@@ -7,6 +7,11 @@ export interface VoiceCallTaskScenario {
   orderRef: string;
   customer: string;
   item: string;
+  items?: Array<{
+    name: string;
+    quantity: number;
+    unitPrice: string;
+  }>;
   quantity: number;
   total: string;
   language: string;
